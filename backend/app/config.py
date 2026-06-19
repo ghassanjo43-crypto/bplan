@@ -26,7 +26,8 @@ class Settings:
     # CORS -----------------------------------------------------------------
     cors_origins: list[str] = os.getenv(
         "BP_CORS_ORIGINS",
-        "http://localhost:5173,http://127.0.0.1:5173",
+        "http://localhost:5173,http://127.0.0.1:5173,"
+        "http://localhost:5174,http://127.0.0.1:5174",
     ).split(",")
 
     # Seed a demo project on first boot if the store is empty.
