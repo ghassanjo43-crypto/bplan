@@ -11,6 +11,20 @@ services:
     envVars:
       - key: BP_SEED_ON_STARTUP
         value: "true"
+      # Initial admin account (seeded on first boot only). Set these in the
+      # Render dashboard or uncomment and provide values here. If omitted, the
+      # insecure code defaults are used (admin@example.com / ChangeMe123!).
+      # - key: ADMIN_EMAIL
+      #   value: admin@example.com
+      # - key: ADMIN_PASSWORD
+      #   sync: false   # set the value in the Render dashboard (do not commit secrets)
+      # - key: ADMIN_FULL_NAME
+      #   value: System Administrator
+      # JWT signing secrets — MUST be set to strong random values in production.
+      # - key: JWT_SECRET_KEY
+      #   generateValue: true
+      # - key: JWT_REFRESH_SECRET_KEY
+      #   generateValue: true
       # Persist data across deploys by attaching a disk and pointing the data
       # dir at it (uncomment the disk block + this var; requires a paid plan).
       # - key: BP_DATA_DIR
