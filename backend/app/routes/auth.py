@@ -37,7 +37,8 @@ REFRESH_COOKIE = "refresh_token"
 
 
 def _set_auth_cookies(response: Response, user) -> None:
-    common = dict(httponly=True, samesite="lax", secure=settings.cookie_secure, path="/")
+    common = dict(httponly=True, samesite=settings.cookie_samesite,
+                  secure=settings.cookie_secure, path="/")
     response.set_cookie(ACCESS_COOKIE, create_access_token(user),
                         max_age=settings.access_token_minutes * 60, **common)
     response.set_cookie(REFRESH_COOKIE, create_refresh_token(user),

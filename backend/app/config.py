@@ -24,11 +24,14 @@ class Settings:
     data_dir: Path = Path(os.getenv("BP_DATA_DIR", Path(__file__).resolve().parent.parent / "data"))
 
     # CORS -----------------------------------------------------------------
-    cors_origins: list[str] = os.getenv(
-        "BP_CORS_ORIGINS",
-        "http://localhost:5173,http://127.0.0.1:5173,"
-        "http://localhost:5174,http://127.0.0.1:5174",
-    ).split(",")
+    cors_origins: list[str] = [
+        o.strip() for o in os.getenv(
+            "BP_CORS_ORIGINS",
+            "https://bplan2-frontend.onrender.com,"
+            "http://localhost:5173,http://127.0.0.1:5173,"
+            "http://localhost:5174,http://127.0.0.1:5174",
+        ).split(",") if o.strip()
+    ]
 
     # Seed a demo project on first boot if the store is empty.
     seed_on_startup: bool = os.getenv("BP_SEED_ON_STARTUP", "true").lower() == "true"
@@ -39,7 +42,15 @@ class Settings:
     jwt_refresh_secret: str = os.getenv("JWT_REFRESH_SECRET_KEY", "dev-insecure-refresh-secret-change-me")
     access_token_minutes: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "15"))
     refresh_token_days: int = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7"))
-    cookie_secure: bool = os.getenv("BP_COOKIE_SECURE", "false").lower() == "true"
+    # Cross-site auth: when frontend and API are on different domains (as on
+    # Render), cookies must be SameSite=None; Secure or the browser drops them.
+    # Defaults below work for that production setup; for local http dev set
+    # BP_COOKIE_SAMESITE=lax and BP_COOKIE_SECURE=false.
+    cookie_samesite: str = os.getenv("BP_COOKIE_SAMESITE", "none").lower()
+    cookie_secure: bool = (
+        os.getenv("BP_COOKIE_SECURE", "true").lower() == "true"
+        or os.getenv("BP_COOKIE_SAMESITE", "none").lower() == "none"
+    )
     max_failed_logins: int = int(os.getenv("BP_MAX_FAILED_LOGINS", "5"))
     lockout_minutes: int = int(os.getenv("BP_LOCKOUT_MINUTES", "15"))
 
