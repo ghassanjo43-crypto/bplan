@@ -25,11 +25,32 @@ function emitUnauthorized() {
   window.dispatchEvent(new CustomEvent('bp:unauthorized'))
 }
 
+// Bearer tokens. Cookies don't work when the frontend and API are on different
+// domains (browsers block third-party cookies), so we keep tokens here and send
+// them in the Authorization header. Cookies still work for same-origin setups.
+const ACCESS_KEY = 'bp_access_token'
+const REFRESH_KEY = 'bp_refresh_token'
+
+export function setTokens(access?: string | null, refresh?: string | null) {
+  if (access) localStorage.setItem(ACCESS_KEY, access)
+  if (refresh) localStorage.setItem(REFRESH_KEY, refresh)
+}
+export function clearTokens() {
+  localStorage.removeItem(ACCESS_KEY)
+  localStorage.removeItem(REFRESH_KEY)
+}
+const getAccess = () => localStorage.getItem(ACCESS_KEY)
+const getRefresh = () => localStorage.getItem(REFRESH_KEY)
+
 async function rawFetch(method: string, path: string, body: unknown, signal: AbortSignal): Promise<Response> {
+  const headers: Record<string, string> = {}
+  if (body !== undefined) headers['Content-Type'] = 'application/json'
+  const access = getAccess()
+  if (access) headers['Authorization'] = `Bearer ${access}`
   return fetch(`${BASE}${path}`, {
     method,
-    credentials: 'include', // send/receive HttpOnly auth cookies
-    headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+    credentials: 'include', // send/receive HttpOnly auth cookies (same-origin)
+    headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
     signal,
   })
@@ -47,12 +68,27 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     res = await rawFetch(method, path, body, controller.signal)
     // Access token expired: try a single silent refresh, then retry once.
     if (res.status === 401 && !NO_REFRESH.some((p) => path.startsWith(p))) {
-      const refreshed = await fetch(`${BASE}/auth/refresh`, { method: 'POST', credentials: 'include' })
-        .then((r) => r.ok)
+      const refreshTok = getRefresh()
+      const refreshed = await fetch(`${BASE}/auth/refresh`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: refreshTok ? { Authorization: `Bearer ${refreshTok}` } : undefined,
+      })
+        .then(async (r) => {
+          if (!r.ok) return false
+          try {
+            const data = await r.json()
+            setTokens(data.access_token, data.refresh_token)
+          } catch {
+            /* no body — relying on refreshed cookies */
+          }
+          return true
+        })
         .catch(() => false)
       if (refreshed) {
         res = await rawFetch(method, path, body, controller.signal)
       } else {
+        clearTokens()
         emitUnauthorized()
       }
     }

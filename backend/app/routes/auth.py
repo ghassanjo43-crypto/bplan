@@ -36,13 +36,18 @@ ACCESS_COOKIE = "access_token"
 REFRESH_COOKIE = "refresh_token"
 
 
-def _set_auth_cookies(response: Response, user) -> None:
+def _issue_tokens(response: Response, user) -> tuple[str, str]:
+    """Mint access+refresh tokens, set them as cookies, and return them so they
+    can also be sent in the response body (for cross-domain bearer-token use)."""
+    access = create_access_token(user)
+    refresh = create_refresh_token(user)
     common = dict(httponly=True, samesite=settings.cookie_samesite,
                   secure=settings.cookie_secure, path="/")
-    response.set_cookie(ACCESS_COOKIE, create_access_token(user),
+    response.set_cookie(ACCESS_COOKIE, access,
                         max_age=settings.access_token_minutes * 60, **common)
-    response.set_cookie(REFRESH_COOKIE, create_refresh_token(user),
+    response.set_cookie(REFRESH_COOKIE, refresh,
                         max_age=settings.refresh_token_days * 86400, **common)
+    return access, refresh
 
 
 def _clear_auth_cookies(response: Response) -> None:
@@ -58,9 +63,9 @@ def login(body: LoginRequest, response: Response, request: Request):
         audit_service.log("login_failed", details=body.email, request=request)
         code = status.HTTP_423_LOCKED if exc.locked else status.HTTP_401_UNAUTHORIZED
         raise HTTPException(status_code=code, detail=exc.message)
-    _set_auth_cookies(response, user)
+    access, refresh = _issue_tokens(response, user)
     audit_service.log("login", user=user, company_id=user.company_id, request=request)
-    return LoginResponse(user=to_public(user))
+    return LoginResponse(user=to_public(user), access_token=access, refresh_token=refresh)
 
 
 @router.post("/logout")
@@ -72,7 +77,13 @@ def logout(response: Response, request: Request):
 
 @router.post("/refresh", response_model=LoginResponse)
 def refresh(request: Request, response: Response):
+    # Cross-domain clients send the refresh token as a bearer header since the
+    # cookie isn't available; fall back to the cookie for same-origin clients.
     token = request.cookies.get(REFRESH_COOKIE)
+    if not token:
+        auth = request.headers.get("authorization", "")
+        if auth.lower().startswith("bearer "):
+            token = auth[7:]
     data = decode_refresh_token(token) if token else None
     if not data:
         raise HTTPException(status_code=401, detail="Session expired")
@@ -82,8 +93,8 @@ def refresh(request: Request, response: Response):
         raise HTTPException(status_code=401, detail="Session expired")
     if not user.is_active:
         raise HTTPException(status_code=401, detail="Session expired")
-    _set_auth_cookies(response, user)
-    return LoginResponse(user=to_public(user))
+    access, refresh_token = _issue_tokens(response, user)
+    return LoginResponse(user=to_public(user), access_token=access, refresh_token=refresh_token)
 
 
 @router.get("/me", response_model=UserPublic)

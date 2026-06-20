@@ -1,12 +1,21 @@
-import { api } from './client'
+import { api, setTokens, clearTokens } from './client'
 import type { AuthUser } from '@/types/auth'
 
-export function loginRequest(email: string, password: string) {
-  return api.post<{ user: AuthUser }>('/auth/login', { email, password })
+export async function loginRequest(email: string, password: string) {
+  const data = await api.post<{ user: AuthUser; access_token?: string; refresh_token?: string }>(
+    '/auth/login',
+    { email, password },
+  )
+  setTokens(data.access_token, data.refresh_token)
+  return data
 }
 
-export function logoutRequest() {
-  return api.post<{ message: string }>('/auth/logout')
+export async function logoutRequest() {
+  try {
+    return await api.post<{ message: string }>('/auth/logout')
+  } finally {
+    clearTokens()
+  }
 }
 
 export function meRequest() {

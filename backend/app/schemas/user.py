@@ -27,6 +27,10 @@ class LoginRequest(BaseModel):
 
 class LoginResponse(BaseModel):
     user: UserPublic
+    # Returned for clients that can't use cross-site cookies (e.g. a static
+    # frontend on a different domain). Sent as Authorization: Bearer.
+    access_token: str | None = None
+    refresh_token: str | None = None
 
 
 class ChangePasswordRequest(BaseModel):
