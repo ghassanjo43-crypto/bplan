@@ -1,7 +1,10 @@
 /* Tiny typed fetch wrapper around the FastAPI backend.
    The Vite dev server proxies /api -> http://127.0.0.1:8000 (see vite.config). */
 
-const BASE = import.meta.env.VITE_API_BASE ?? '/api'
+// Accept either VITE_API_BASE or VITE_API_URL; default to the dev proxy path.
+// Normalize so the value always ends in the backend's /api prefix.
+const RAW = (import.meta.env.VITE_API_BASE ?? import.meta.env.VITE_API_URL ?? '/api').trim()
+const BASE = /\/api\/?$/.test(RAW) ? RAW.replace(/\/$/, '') : RAW.replace(/\/$/, '') + '/api'
 
 export class ApiError extends Error {
   status: number
