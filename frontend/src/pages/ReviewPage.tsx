@@ -6,6 +6,7 @@ import { SectionCard } from '@/components/SectionCard'
 import { ReviewSection, type SummaryRow } from '@/components/ReviewSection'
 import { LoadingScreen } from '@/components/ui/Spinner'
 import { exportJsonUrl } from '@/api/hooks'
+import { downloadFile } from '@/api/client'
 import { useProjectContext } from '@/layouts/ProjectContext'
 import { useReview } from '@/api/hooks'
 import { useToast } from '@/components/ui/Toast'
@@ -54,9 +55,13 @@ export function ReviewPage() {
     (project.financing?.loans ?? []).reduce((s, l) => s + l.amount, 0) +
     (project.financing?.grants ?? []).reduce((s, g) => s + g.amount, 0)
 
-  const handleExport = () => {
-    window.open(exportJsonUrl(projectId), '_blank')
-    notify('Assumptions exported as JSON')
+  const handleExport = async () => {
+    try {
+      await downloadFile(exportJsonUrl(projectId), `business-plan-${projectId}.json`)
+      notify('Assumptions exported as JSON')
+    } catch (e) {
+      notify((e as Error).message || 'Export failed', 'error')
+    }
   }
 
   return (

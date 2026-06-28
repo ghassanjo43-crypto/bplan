@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Modal } from '@/components/ui/Modal'
 import { Badge } from '@/components/ui/Badge'
 import { useToast } from '@/components/ui/Toast'
+import { downloadFile } from '@/api/client'
 import {
   useDeleteExcel,
   useExcelExports,
@@ -66,6 +67,18 @@ export function ExcelModelExportDialog({
       onSuccess: (f) => notify(`Excel model generated (${fmtSize(f.file_size)}).`, 'success'),
       onError: (e) => notify((e as Error).message ?? 'Excel generation failed.', 'error'),
     })
+
+  const [downloadingId, setDownloadingId] = useState<string | null>(null)
+  const download = async (exportId: string, url: string, fileName: string) => {
+    setDownloadingId(exportId)
+    try {
+      await downloadFile(url, fileName)
+    } catch (e) {
+      notify((e as Error).message || 'Download failed', 'error')
+    } finally {
+      setDownloadingId(null)
+    }
+  }
 
   return (
     <Modal
@@ -159,7 +172,13 @@ export function ExcelModelExportDialog({
                       <td style={{ textAlign: 'right' }}>{fmtSize(e.file_size)}</td>
                       <td style={{ textAlign: 'right' }}>
                         <div className="row" style={{ gap: 6, justifyContent: 'flex-end' }}>
-                          <a className="btn btn--secondary btn--sm" href={e.download_url} download={e.file_name}>⤓ Download</a>
+                          <button
+                            className="btn btn--secondary btn--sm"
+                            onClick={() => download(e.export_id, e.download_url, e.file_name)}
+                            disabled={downloadingId === e.export_id}
+                          >
+                            {downloadingId === e.export_id ? '…' : '⤓ Download'}
+                          </button>
                           <button className="btn btn--ghost btn--sm" onClick={() => remove.mutate(e.export_id)}>Delete</button>
                         </div>
                       </td>

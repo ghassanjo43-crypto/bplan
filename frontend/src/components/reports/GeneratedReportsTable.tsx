@@ -1,4 +1,7 @@
+import { useState } from 'react'
 import { ReportFormatBadge } from './ReportStatusBadge'
+import { downloadFile } from '@/api/client'
+import { useToast } from '@/components/ui/Toast'
 import type { ReportFile } from '@/types/reports'
 
 function fmtSize(bytes: number): string {
@@ -21,6 +24,20 @@ export function GeneratedReportsTable({
   onDelete: (reportId: string) => void
   deletingId?: string | null
 }) {
+  const { notify } = useToast()
+  const [downloadingId, setDownloadingId] = useState<string | null>(null)
+
+  const handleDownload = async (r: ReportFile) => {
+    setDownloadingId(r.report_id)
+    try {
+      await downloadFile(r.download_url, r.file_name)
+    } catch (e) {
+      notify((e as Error).message || 'Download failed', 'error')
+    } finally {
+      setDownloadingId(null)
+    }
+  }
+
   if (reports.length === 0) {
     return <p className="muted" style={{ fontSize: 13.5 }}>No reports generated yet. Choose your options above and generate a Word or PDF report.</p>
   }
@@ -52,9 +69,13 @@ export function GeneratedReportsTable({
               <td>{fmtDate(r.created_at)}</td>
               <td style={{ textAlign: 'right' }}>
                 <div className="row" style={{ gap: 6, justifyContent: 'flex-end' }}>
-                  <a className="btn btn--secondary btn--sm" href={r.download_url} download={r.file_name}>
-                    ⤓ Download
-                  </a>
+                  <button
+                    className="btn btn--secondary btn--sm"
+                    onClick={() => handleDownload(r)}
+                    disabled={downloadingId === r.report_id}
+                  >
+                    {downloadingId === r.report_id ? '…' : '⤓ Download'}
+                  </button>
                   <button
                     className="btn btn--ghost btn--sm"
                     onClick={() => onDelete(r.report_id)}

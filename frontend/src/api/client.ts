@@ -58,6 +58,94 @@ async function rawFetch(method: string, path: string, body: unknown, signal: Abo
 
 const NO_REFRESH = ['/auth/login', '/auth/refresh', '/auth/logout']
 
+/** Exchange the refresh token for a fresh access token. Returns success. */
+async function refreshAccessToken(): Promise<boolean> {
+  const refreshTok = getRefresh()
+  return fetch(`${BASE}/auth/refresh`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: refreshTok ? { Authorization: `Bearer ${refreshTok}` } : undefined,
+  })
+    .then(async (r) => {
+      if (!r.ok) return false
+      try {
+        const data = await r.json()
+        setTokens(data.access_token, data.refresh_token)
+      } catch {
+        /* no body — relying on refreshed cookies */
+      }
+      return true
+    })
+    .catch(() => false)
+}
+
+/** Origin of the API (e.g. https://api.example.com), or the page origin in dev. */
+function apiOrigin(): string {
+  try {
+    return new URL(BASE, window.location.origin).origin
+  } catch {
+    return window.location.origin
+  }
+}
+
+/**
+ * Download a file from an authenticated API endpoint and save it client-side.
+ *
+ * A native `<a download>` can't do this on a cross-domain deploy: it can't send
+ * the bearer token, and it resolves a relative `/api/...` URL against the
+ * *frontend* origin (which has no API) — the browser then reports "the file
+ * wasn't available on this site". Instead we fetch the bytes with auth
+ * (refreshing once on 401) and trigger the save from the resulting blob.
+ *
+ * @param downloadUrl absolute (`https://api/api/...`) or app-relative (`/api/...`)
+ */
+export async function downloadFile(downloadUrl: string, filename: string): Promise<void> {
+  const url = new URL(downloadUrl, apiOrigin()).toString()
+  const doFetch = () =>
+    fetch(url, {
+      method: 'GET',
+      credentials: 'include',
+      headers: getAccess() ? { Authorization: `Bearer ${getAccess()}` } : undefined,
+    }).catch(() => null)
+
+  let res = await doFetch()
+  if (res && res.status === 401) {
+    if (await refreshAccessToken()) {
+      res = await doFetch()
+    } else {
+      clearTokens()
+      emitUnauthorized()
+    }
+  }
+  if (!res) throw new ApiError(0, BACKEND_DOWN_HINT, null)
+  if (!res.ok) {
+    let detail: unknown = null
+    try {
+      detail = await res.json()
+    } catch {
+      /* non-JSON error body */
+    }
+    const apiDetail = (detail as { detail?: unknown } | null)?.detail
+    const message =
+      typeof apiDetail === 'string'
+        ? apiDetail
+        : res.status === 404
+          ? 'The file is no longer available on the server. Please generate it again.'
+          : `Download failed (HTTP ${res.status})`
+    throw new ApiError(res.status, message, detail)
+  }
+
+  const blob = await res.blob()
+  const objectUrl = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = objectUrl
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 1000)
+}
+
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   let res: Response
   // Guard against a request that never settles (e.g. a dev-proxy connection
@@ -68,24 +156,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     res = await rawFetch(method, path, body, controller.signal)
     // Access token expired: try a single silent refresh, then retry once.
     if (res.status === 401 && !NO_REFRESH.some((p) => path.startsWith(p))) {
-      const refreshTok = getRefresh()
-      const refreshed = await fetch(`${BASE}/auth/refresh`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: refreshTok ? { Authorization: `Bearer ${refreshTok}` } : undefined,
-      })
-        .then(async (r) => {
-          if (!r.ok) return false
-          try {
-            const data = await r.json()
-            setTokens(data.access_token, data.refresh_token)
-          } catch {
-            /* no body — relying on refreshed cookies */
-          }
-          return true
-        })
-        .catch(() => false)
-      if (refreshed) {
+      if (await refreshAccessToken()) {
         res = await rawFetch(method, path, body, controller.signal)
       } else {
         clearTokens()
