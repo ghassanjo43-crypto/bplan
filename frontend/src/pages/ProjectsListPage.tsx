@@ -68,6 +68,9 @@ export function ProjectsListPage() {
           </div>
         </div>
         <div className="row" style={{ gap: 12, alignItems: 'center' }}>
+          <button className="btn btn--ghost btn--sm" onClick={() => navigate('/guide')} title="How this app works">
+            ? Guide
+          </button>
           <UserMenu />
           <button className="btn btn--primary btn--lg" onClick={() => navigate('/projects/new')}>
             + New Business Plan

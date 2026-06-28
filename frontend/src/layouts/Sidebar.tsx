@@ -48,6 +48,10 @@ export function Sidebar() {
           <span className="nav-item__index">←</span>
           <span className="nav-item__label">All Projects</span>
         </NavLink>
+        <NavLink to="/guide" className="nav-item">
+          <span className="nav-item__index">?</span>
+          <span className="nav-item__label">User Guide</span>
+        </NavLink>
         {completion && (
           <div className="muted" style={{ fontSize: 11.5, padding: '8px 11px 0', color: 'var(--slate-500)' }}>
             {completion.completed_sections} of {completion.total_sections} sections complete

@@ -32,6 +32,10 @@ export interface FieldConfig {
   allowNegative?: boolean
   /** Conditional visibility based on current form values. */
   visibleWhen?: (values: Record<string, unknown>) => boolean
+  /** Conditionally disable (grey out) the field based on current form values. */
+  disabledWhen?: (values: Record<string, unknown>) => boolean
+  /** Helper text shown under the field while it is disabled. */
+  disabledHint?: string
   /** Currency-style display unit override (e.g. for "days"). */
   unit?: string
 }

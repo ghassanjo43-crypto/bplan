@@ -18,9 +18,14 @@ function configFor(product: ProductService): FormConfig {
         },
         {
           name: 'annual_growth_rate', label: 'Annual Sales Growth', kind: 'percent', allowNegative: true, max: 1000,
-          help: 'Year-over-year growth. May be negative; extreme values trigger a warning.',
+          help: 'Year-over-year sales growth as a percentage (e.g. enter 20 for +20% per year). May be negative; extreme values trigger a warning.',
         },
-        { name: 'monthly_growth_rate', label: 'Monthly Growth (optional)', kind: 'percent', allowNegative: true, max: 1000 },
+        {
+          name: 'monthly_growth_rate', label: 'Monthly Growth (optional)', kind: 'percent', allowNegative: true, max: 1000,
+          help: 'Optional override of the annual figure. Disabled while Annual Sales Growth has a value.',
+          disabledWhen: (v) => v.annual_growth_rate !== null && v.annual_growth_rate !== undefined && v.annual_growth_rate !== '',
+          disabledHint: 'Clear Annual Sales Growth to set a monthly rate instead.',
+        },
         { name: 'number_of_customers', label: 'Number of Customers', kind: 'number' },
         { name: 'customer_growth_rate', label: 'Customer Growth Rate', kind: 'percent', allowNegative: true, max: 1000 },
       ],

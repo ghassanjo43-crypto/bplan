@@ -25,6 +25,7 @@ import { FinancialAnalysisPage } from '@/pages/FinancialAnalysisPage'
 import { ReportsPage } from '@/pages/ReportsPage'
 import { TextBuilderPage } from '@/pages/TextBuilderPage'
 import { LoginPage } from '@/pages/LoginPage'
+import { GuidePage } from '@/pages/GuidePage'
 import { UserManagementPage } from '@/pages/admin/UserManagementPage'
 import { ProtectedRoute, AdminRoute } from '@/auth/ProtectedRoute'
 
@@ -37,6 +38,7 @@ export function AppRoutes() {
       <Route path="/" element={<Navigate to="/projects" replace />} />
       <Route path="/projects" element={<ProjectsListPage />} />
       <Route path="/projects/new" element={<NewProjectPage />} />
+      <Route path="/guide" element={<GuidePage />} />
       <Route element={<AdminRoute />}>
         <Route path="/admin/users" element={<UserManagementPage />} />
       </Route>

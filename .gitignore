@@ -32,3 +32,7 @@ frontend/tsconfig.tsbuildinfo
 
 # Generated Excel exports
 backend/generated_exports/
+
+# Generated Word/PDF reports (runtime output, not source)
+backend/generated_reports/
+!backend/generated_reports/.gitkeep

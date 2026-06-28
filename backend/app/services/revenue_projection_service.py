@@ -53,11 +53,16 @@ def default_price(product, ra) -> float:
 
 
 def _growth_monthly(ra) -> float:
+    # Annual Sales Growth is the primary input; the UI disables the monthly
+    # field whenever an annual rate is set. Annual therefore takes precedence,
+    # and the optional monthly rate is only used when annual is left blank.
     if ra is None:
         return 0.0
+    if ra.annual_growth_rate is not None:
+        return (1 + ra.annual_growth_rate / 100.0) ** (1 / 12) - 1
     if ra.monthly_growth_rate is not None:
         return ra.monthly_growth_rate / 100.0
-    return (1 + (ra.annual_growth_rate or 0) / 100.0) ** (1 / 12) - 1
+    return 0.0
 
 
 def _season(ra, month: int) -> float:

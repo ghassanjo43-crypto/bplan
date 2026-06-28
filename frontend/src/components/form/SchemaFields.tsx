@@ -106,6 +106,8 @@ function FieldRenderer({
 }) {
   if (field.visibleWhen && !field.visibleWhen(values)) return null
 
+  const disabled = field.disabledWhen ? field.disabledWhen(values) : false
+
   return (
     <Controller
       name={field.name}
@@ -113,6 +115,7 @@ function FieldRenderer({
       render={({ field: rhf, fieldState }) => {
         const error = fieldState.error?.message
         const span = field.span ?? (field.kind === 'textarea' ? 2 : 1)
+        const hint = disabled ? field.disabledHint ?? field.hint : field.hint
 
         // Switch/checkbox render inline (label beside control).
         if (field.kind === 'switch' || field.kind === 'checkbox') {
@@ -121,12 +124,12 @@ function FieldRenderer({
               label={field.label}
               required={field.required}
               help={field.help}
-              hint={field.hint}
+              hint={hint}
               error={error}
               span={span}
             >
               <div className="row" style={{ gap: 10 }}>
-                <Switch checked={!!rhf.value} onChange={rhf.onChange} id={field.name} />
+                <Switch checked={!!rhf.value} onChange={rhf.onChange} id={field.name} disabled={disabled} />
                 <span className="muted" style={{ fontSize: 13 }}>
                   {rhf.value ? 'Enabled' : 'Disabled'}
                 </span>
@@ -141,11 +144,11 @@ function FieldRenderer({
             htmlFor={field.name}
             required={field.required}
             help={field.help}
-            hint={field.hint}
+            hint={hint}
             error={error}
             span={span}
           >
-            {renderControl(field, rhf, currency, !!error)}
+            {renderControl(field, rhf, currency, !!error, disabled)}
           </FormField>
         )
       }}
@@ -158,6 +161,7 @@ function renderControl(
   rhf: { value: unknown; onChange: (v: unknown) => void },
   currency: string,
   error: boolean,
+  disabled: boolean,
 ) {
   const num = (rhf.value ?? null) as number | null
   switch (field.kind) {
@@ -169,6 +173,7 @@ function renderControl(
           onChange={rhf.onChange}
           placeholder={field.placeholder}
           error={error}
+          disabled={disabled}
         />
       )
     case 'textarea':
@@ -179,6 +184,7 @@ function renderControl(
           onChange={rhf.onChange}
           placeholder={field.placeholder}
           error={error}
+          disabled={disabled}
         />
       )
     case 'number':
@@ -191,6 +197,7 @@ function renderControl(
           unit={field.unit}
           allowNegative={field.allowNegative}
           error={error}
+          disabled={disabled}
         />
       )
     case 'currency':
@@ -203,6 +210,7 @@ function renderControl(
           placeholder={field.placeholder}
           allowNegative={field.allowNegative}
           error={error}
+          disabled={disabled}
         />
       )
     case 'percent':
@@ -214,6 +222,7 @@ function renderControl(
           placeholder={field.placeholder}
           allowNegative={field.allowNegative}
           error={error}
+          disabled={disabled}
         />
       )
     case 'date':
@@ -223,6 +232,7 @@ function renderControl(
           value={(rhf.value as string) ?? null}
           onChange={rhf.onChange}
           error={error}
+          disabled={disabled}
         />
       )
     case 'select':
@@ -234,6 +244,7 @@ function renderControl(
           options={field.options ?? []}
           placeholder={field.placeholder}
           error={error}
+          disabled={disabled}
         />
       )
     default:
