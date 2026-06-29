@@ -11,7 +11,7 @@ const config: FormConfig = [
     subtitle: 'How quickly customers pay you.',
     icon: '◲',
     fields: [
-      { name: 'accounts_receivable_days', label: 'Accounts Receivable Days', kind: 'number', unit: 'days', help: 'Average days customers take to pay (DSO).' },
+      { name: 'accounts_receivable_days', label: 'Default customer collection days', kind: 'number', unit: 'days', help: 'Average days customers take to pay (DSO). Used only when a revenue stream has no specific payment terms — product Payment Terms override this.' },
       { name: 'percent_sales_on_credit', label: '% of Sales on Credit', kind: 'percent' },
       { name: 'bad_debt_percent', label: 'Bad Debt %', kind: 'percent', help: 'Share of credit sales never collected.' },
       { name: 'customer_deposit_percent', label: 'Customer Deposit %', kind: 'percent', help: 'Upfront deposit collected from customers.' },
@@ -22,7 +22,7 @@ const config: FormConfig = [
     subtitle: 'How you manage supplier terms and stock.',
     icon: '◳',
     fields: [
-      { name: 'accounts_payable_days', label: 'Accounts Payable Days', kind: 'number', unit: 'days', help: 'Average days you take to pay suppliers (DPO).' },
+      { name: 'accounts_payable_days', label: 'Default supplier payment days', kind: 'number', unit: 'days', help: 'Average days you take to pay suppliers (DPO). Used only for costs without supplier-specific payment terms — Direct Cost supplier terms override this.' },
       { name: 'inventory_days', label: 'Inventory Days', kind: 'number', unit: 'days', help: 'Average days inventory is held (DIO).' },
       { name: 'safety_stock_percent', label: 'Safety Stock %', kind: 'percent' },
       { name: 'supplier_advance_percent', label: 'Supplier Advance %', kind: 'percent' },
@@ -33,7 +33,7 @@ const config: FormConfig = [
     title: 'Cash Reserve',
     icon: '◰',
     fields: [
-      { name: 'minimum_cash_balance', label: 'Minimum Cash Balance', kind: 'currency', help: 'Floor the model should keep available at all times.' },
+      { name: 'minimum_cash_balance', label: 'Operating minimum cash reserve', kind: 'currency', help: 'Cash floor used for cash-flow planning and funding-gap checks. Separate from the KPI “Target minimum cash balance”, which is a reporting benchmark only.' },
       { name: 'collection_warning_threshold_days', label: 'Collection Warning Threshold', kind: 'number', unit: 'days' },
       { name: 'notes', label: 'Notes', kind: 'textarea', span: 2 },
     ],
@@ -53,6 +53,11 @@ export function WorkingCapitalPage() {
         const ccc = dio + dso - dpo
         const squeeze = dso > 2 * Math.max(dpo, 1)
         return (
+          <>
+          <div className="banner banner--info" style={{ marginBottom: 16 }}>
+            <span className="banner__icon">ℹ</span>
+            <div>These are <strong>defaults</strong>. A product’s Payment Terms (Revenue) and a cost’s Supplier Payment Terms (Direct Costs) override the collection / payment days set here.</div>
+          </div>
           <SectionCard title="Cash Conversion Cycle" subtitle="Live preview from your inputs" icon="◷">
             <div className="stat-grid">
               <SummaryCard label="DSO (Receivables)" value={`${dso} days`} accent="blue" />
@@ -67,6 +72,7 @@ export function WorkingCapitalPage() {
               />
             </div>
           </SectionCard>
+          </>
         )
       }}
     />

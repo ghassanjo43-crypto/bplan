@@ -405,11 +405,19 @@ def calculate_staff_costs(ctx: Ctx) -> tuple[list[float], list[IncomeStatementLi
 
     scen_mult = 1 + scen.salary / 100.0
 
+    # Employer social security: a role may override the rate; otherwise the
+    # global Tax & Regulatory default applies. Single source of truth — the rate
+    # is not asked for twice.
+    global_ss_rate = (project.tax.employer_social_security_rate if project.tax else 0.0) or 0.0
+
     for role in project.staffing:
         if not role.active:
             continue
         hire_idx = max(0, _months_between(start, role.hiring_start_date)) if role.hiring_start_date else 0
         num = role.number_of_employees
+        ss_rate = role.employer_social_security_percent
+        if ss_rate is None:
+            ss_rate = global_ss_rate
         arr = _zeros(n)
         for t in range(hire_idx, n):
             yi = ctx.year_index(t)
@@ -418,7 +426,7 @@ def calculate_staff_costs(ctx: Ctx) -> tuple[list[float], list[IncomeStatementLi
             health = role.health_insurance_amount * num / 12.0
             visa = role.visa_permit_cost * num / 12.0
             bonus = base * role.bonus_percent / 100.0 + role.bonus_amount * num / 12.0
-            emp_ss = base * role.employer_social_security_percent / 100.0
+            emp_ss = base * ss_rate / 100.0
             gratuity = base * role.gratuity_percent / 100.0
             commission = 0.0 if commission_in_cogs else base * role.sales_commission_percent / 100.0
             arr[t] = (base + benefits + health + visa + bonus + emp_ss + gratuity + commission) * scen_mult

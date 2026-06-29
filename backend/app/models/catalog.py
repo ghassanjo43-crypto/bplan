@@ -132,8 +132,11 @@ class DirectCostItem(EntityBase):
     currency_override: str | None = Field(default=None, max_length=3)
     vat_applicable: bool = False
 
-    # Lifecycle
-    start_date: date
+    # Lifecycle. ``start_date`` is optional: when a cost is linked to a
+    # product/service and left blank, the projection follows that product's
+    # launch date (see direct_cost_projection_service._cost_start). This keeps
+    # the launch date a single source of truth instead of re-entering it here.
+    start_date: date | None = None
     end_date: date | None = None
     active: bool = True
 

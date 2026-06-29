@@ -24,6 +24,10 @@ export interface FieldConfig {
   max?: number
   step?: number
   required?: boolean
+  /** Conditionally required based on current form values (e.g. custom payment
+   *  days only when payment terms = custom). Drives both the asterisk and the
+   *  validation rule. */
+  requiredWhen?: (values: Record<string, unknown>) => boolean
   /** Static helper text under the field. */
   hint?: string
   /** Grid span (default 1). */

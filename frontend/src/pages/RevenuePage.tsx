@@ -4,17 +4,34 @@ import type { ProductService, RevenueAssumption } from '@/types'
 import { formatNumber, formatPercent } from '@/utils/format'
 import { labelFor, paymentTermsOptions, refundBasisOptions, revenueTypeOptions } from '@/utils/options'
 
+// First-month quantity means different things per revenue model — the help text
+// adapts so users enter the right unit without a separate field per type.
+const VOLUME_HELP: Record<string, string> = {
+  unit_sales: 'Units sold in Month 1.',
+  subscription: 'Active paying subscribers in Month 1.',
+  service_contract: 'Contracts expected in Month 1.',
+  project_based: 'Contracts / projects expected in Month 1.',
+  commission: 'Commissionable transactions in Month 1.',
+  licensing: 'Licenses active / sold in Month 1.',
+  other: 'Sales quantity in Month 1.',
+}
+
+// Per-model price override: the product Selling Price is the master price; these
+// only override it when a revenue model charges differently.
+const overrideHelp = (price: number, label: string) =>
+  `Optional override. Leave blank to use the product's Selling Price (${formatNumber(price)}) as the ${label}.`
+
 function configFor(product: ProductService): FormConfig {
   const t = product.revenue_type
   return [
     {
       title: 'Volume & Growth',
-      subtitle: 'How sales volume starts and scales over time.',
+      subtitle: 'How sales quantity starts and scales over time. This is the single master sales-quantity input.',
       icon: '◴',
       fields: [
         {
-          name: 'starting_monthly_volume', label: 'Starting Monthly Volume', kind: 'number', required: true,
-          help: 'Units (or transactions) sold in the first month.',
+          name: 'starting_monthly_volume', label: 'First-month sales quantity', kind: 'number', required: true,
+          help: `${VOLUME_HELP[t] ?? VOLUME_HELP.other} This is the master quantity that drives revenue — you don't enter it again per revenue model.`,
         },
         {
           name: 'annual_growth_rate', label: 'Annual Sales Growth', kind: 'percent', allowNegative: true, max: 1000,
@@ -26,31 +43,40 @@ function configFor(product: ProductService): FormConfig {
           disabledWhen: (v) => v.annual_growth_rate !== null && v.annual_growth_rate !== undefined && v.annual_growth_rate !== '',
           disabledHint: 'Clear Annual Sales Growth to set a monthly rate instead.',
         },
-        { name: 'number_of_customers', label: 'Number of Customers', kind: 'number' },
-        { name: 'customer_growth_rate', label: 'Customer Growth Rate', kind: 'percent', allowNegative: true, max: 1000 },
+        {
+          name: 'number_of_customers', label: 'Starting customer base', kind: 'number',
+          visibleWhen: () => t === 'unit_sales' || t === 'other',
+          help: 'Optional. The installed base of customers, used together with Purchase Frequency. Different from the first-month sales quantity above.',
+        },
+        { name: 'customer_growth_rate', label: 'Customer Growth Rate', kind: 'percent', allowNegative: true, max: 1000,
+          visibleWhen: () => t === 'unit_sales' || t === 'other' },
       ],
     },
     // -- Revenue-type specific block ------------------------------------
     {
       title: 'Revenue Drivers',
-      subtitle: `Fields tailored to “${labelFor(revenueTypeOptions, t)}” style revenue.`,
+      subtitle: `Pricing defaults to the product's Selling Price — only set an override below if “${labelFor(revenueTypeOptions, t)}” revenue is priced differently.`,
       icon: '◵',
       fields: [
-        { name: 'average_order_value', label: 'Average Order Value', kind: 'currency', visibleWhen: () => t === 'unit_sales' || t === 'other' },
+        { name: 'average_order_value', label: 'Override Average Order Value', kind: 'currency', visibleWhen: () => t === 'unit_sales' || t === 'other',
+          help: overrideHelp(product.selling_price, 'average order value') },
         { name: 'purchase_frequency', label: 'Purchase Frequency / yr', kind: 'number', visibleWhen: () => t === 'unit_sales' || t === 'other' },
         {
           name: 'repeat_purchase_rate', label: 'Repeat Purchase Rate', kind: 'percent', visibleWhen: () => t === 'unit_sales' || t === 'other',
           help: 'Share of customers who buy again.',
         },
-        { name: 'subscription_price', label: 'Subscription Price', kind: 'currency', visibleWhen: () => t === 'subscription' },
+        { name: 'subscription_price', label: 'Override Subscription Price', kind: 'currency', visibleWhen: () => t === 'subscription',
+          help: overrideHelp(product.selling_price, 'subscription price') },
         {
           name: 'churn_rate', label: 'Monthly Churn Rate', kind: 'percent', visibleWhen: () => t === 'subscription',
           help: 'Percentage of subscribers lost each month.',
         },
-        { name: 'contract_value', label: 'Contract Value', kind: 'currency', visibleWhen: () => t === 'service_contract' || t === 'project_based' },
-        { name: 'number_of_contracts', label: 'Number of Contracts', kind: 'number', visibleWhen: () => t === 'service_contract' || t === 'project_based' },
-        { name: 'commission_rate', label: 'Commission Rate', kind: 'percent', visibleWhen: () => t === 'commission' },
-        { name: 'licensing_fee', label: 'Licensing Fee', kind: 'currency', visibleWhen: () => t === 'licensing' },
+        { name: 'contract_value', label: 'Override Contract Value', kind: 'currency', visibleWhen: () => t === 'service_contract' || t === 'project_based',
+          help: overrideHelp(product.selling_price, 'value per contract') },
+        { name: 'commission_rate', label: 'Commission Rate', kind: 'percent', visibleWhen: () => t === 'commission',
+          help: 'Applied to the order value to earn commission revenue.' },
+        { name: 'licensing_fee', label: 'Override Licensing Fee', kind: 'currency', visibleWhen: () => t === 'licensing',
+          help: overrideHelp(product.selling_price, 'licensing fee') },
       ],
     },
     {
@@ -62,11 +88,13 @@ function configFor(product: ProductService): FormConfig {
         { name: 'refund_basis', label: 'Refund Basis', kind: 'select', options: refundBasisOptions },
         {
           name: 'payment_terms', label: 'Payment Terms', kind: 'select', options: paymentTermsOptions,
-          help: 'When customers pay — affects accounts receivable and cash flow.',
+          help: 'Primary driver of when this stream collects cash (receivables). Overrides the Working Capital default collection days.',
         },
         {
-          name: 'custom_payment_days', label: 'Custom Payment Days', kind: 'number', unit: 'days',
+          name: 'custom_payment_days', label: 'Custom Payment Days', kind: 'number', unit: 'days', min: 1,
           visibleWhen: (v) => v.payment_terms === 'custom',
+          requiredWhen: (v) => v.payment_terms === 'custom',
+          help: 'Required when Payment Terms is Custom. Number of days customers take to pay.',
         },
       ],
     },

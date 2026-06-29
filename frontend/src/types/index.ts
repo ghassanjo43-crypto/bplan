@@ -144,7 +144,8 @@ export interface DirectCostItem extends EntityBase {
   minimum_order_quantity?: number | null
   currency_override?: string | null
   vat_applicable: boolean
-  start_date: string
+  /** Optional — blank follows the linked product's launch date. */
+  start_date?: string | null
   end_date?: string | null
   active: boolean
 }
@@ -162,7 +163,8 @@ export interface StaffRole extends EntityBase {
   bonus_amount: number
   bonus_percent: number
   sales_commission_percent: number
-  employer_social_security_percent: number
+  /** Optional role-specific override; null uses the Tax page global default. */
+  employer_social_security_percent?: number | null
   gratuity_percent: number
   active: boolean
 }

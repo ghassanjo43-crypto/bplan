@@ -31,7 +31,7 @@ const config: FormConfig = [
       { name: 'bonus_amount', label: 'Bonus Amount', kind: 'currency' },
       { name: 'bonus_percent', label: 'Bonus %', kind: 'percent' },
       { name: 'sales_commission_percent', label: 'Sales Commission %', kind: 'percent' },
-      { name: 'employer_social_security_percent', label: 'Employer Social Security %', kind: 'percent', help: 'Employer-paid social contributions.' },
+      { name: 'employer_social_security_percent', label: 'Employer Social Security % (override)', kind: 'percent', help: 'Optional role-specific override. Leave blank to use the global default set on the Tax & Regulatory page.' },
       { name: 'gratuity_percent', label: 'End-of-service / Gratuity %', kind: 'percent' },
       { name: 'notes', label: 'Notes', kind: 'textarea', span: 2 },
     ],

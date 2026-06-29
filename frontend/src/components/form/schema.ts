@@ -9,7 +9,23 @@ export function buildZodSchema(config: FormConfig): z.ZodTypeAny {
   for (const f of allFields(config)) {
     shape[f.name] = fieldSchema(f)
   }
-  return z.object(shape)
+  const base = z.object(shape)
+
+  // Conditionally-required fields (requiredWhen) are validated at submit time
+  // against the current values, so the rule and the asterisk always agree.
+  const conditional = allFields(config).filter((f) => f.requiredWhen)
+  if (conditional.length === 0) return base
+  return base.superRefine((values: Record<string, unknown>, ctx) => {
+    for (const f of conditional) {
+      if (!f.requiredWhen!(values)) continue
+      const v = values[f.name]
+      const empty =
+        v === null || v === undefined || v === '' || (typeof v === 'number' && Number.isNaN(v))
+      if (empty) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: [f.name], message: 'This field is required' })
+      }
+    }
+  })
 }
 
 function fieldSchema(f: FieldConfig): z.ZodTypeAny {

@@ -50,7 +50,7 @@ type Form = {
   minimum_order_quantity: number | null
   currency_override: string | null
   vat_applicable: boolean
-  start_date: string
+  start_date: string | null
   end_date: string | null
   active: boolean
   notes: string | null
@@ -75,7 +75,8 @@ const schema = z
     minimum_order_quantity: z.number().nullable(),
     currency_override: z.string().nullish(),
     vat_applicable: z.boolean(),
-    start_date: z.string().min(1, 'Start date is required'),
+    // Optional — blank means "follow the linked product's launch date".
+    start_date: z.string().nullish(),
     end_date: z.string().nullish(),
     active: z.boolean(),
     notes: z.string().nullish(),
@@ -108,7 +109,6 @@ const schema = z
 export type DirectCostPrefill = Partial<Pick<Form, 'name' | 'category' | 'calculation_method' | 'cost_behavior'>>
 
 function toForm(item: DirectCostItem | null, prefill?: DirectCostPrefill): Form {
-  const today = new Date().toISOString().slice(0, 10)
   if (item) {
     return {
       name: item.name,
@@ -128,7 +128,7 @@ function toForm(item: DirectCostItem | null, prefill?: DirectCostPrefill): Form 
       minimum_order_quantity: item.minimum_order_quantity ?? null,
       currency_override: item.currency_override ?? null,
       vat_applicable: item.vat_applicable,
-      start_date: item.start_date,
+      start_date: item.start_date ?? '',
       end_date: item.end_date ?? null,
       active: item.active,
       notes: item.notes ?? null,
@@ -152,7 +152,7 @@ function toForm(item: DirectCostItem | null, prefill?: DirectCostPrefill): Form 
     minimum_order_quantity: null,
     currency_override: null,
     vat_applicable: false,
-    start_date: today,
+    start_date: '',
     end_date: null,
     active: true,
     notes: null,
@@ -251,7 +251,7 @@ export function DirectCostModal({
       minimum_order_quantity: v.minimum_order_quantity,
       currency_override: v.currency_override || null,
       vat_applicable: v.vat_applicable,
-      start_date: v.start_date,
+      start_date: v.start_date || null,
       end_date: v.end_date || null,
       active: v.active,
       notes: v.notes || null,
@@ -451,7 +451,7 @@ export function DirectCostModal({
               </FormField>
             )} />
             <Controller control={control} name="supplier_payment_terms" render={({ field }) => (
-              <FormField label="Supplier Payment Terms">
+              <FormField label="Supplier Payment Terms" help="Drives when this cost is paid (payables). Overrides the Working Capital default supplier payment days.">
                 <SelectInput value={field.value} onChange={field.onChange} options={paymentTermsOptions} />
               </FormField>
             )} />
@@ -476,8 +476,9 @@ export function DirectCostModal({
               </FormField>
             )} />
             <Controller control={control} name="start_date" render={({ field }) => (
-              <FormField label="Start Date" required error={err.start_date?.message}>
-                <DateInput value={field.value} onChange={(v) => field.onChange(v ?? '')} error={!!err.start_date} />
+              <FormField label="Start Date (optional)" error={err.start_date?.message}
+                help="Leave blank to follow the linked product's launch date. Set a date only to override when the cost starts.">
+                <DateInput value={field.value ?? null} onChange={(v) => field.onChange(v ?? '')} error={!!err.start_date} />
               </FormField>
             )} />
             <Controller control={control} name="end_date" render={({ field }) => (
@@ -486,7 +487,7 @@ export function DirectCostModal({
               </FormField>
             )} />
             <Controller control={control} name="vat_applicable" render={({ field }) => (
-              <FormField label="VAT Applicable">
+              <FormField label="This item is VAT-applicable" help="Marks whether this cost is subject to VAT at the project default rate (set on the Tax page). It does not set the rate.">
                 <div className="row" style={{ gap: 10 }}>
                   <Switch checked={field.value} onChange={field.onChange} />
                   <span className="muted" style={{ fontSize: 13 }}>{field.value ? 'Yes' : 'No'}</span>

@@ -26,7 +26,7 @@ const config: FormConfig = [
       { name: 'start_date', label: 'Start Date', kind: 'date' },
       { name: 'end_date', label: 'End Date (optional)', kind: 'date' },
       { name: 'inflation_percent', label: 'Annual Escalation %', kind: 'percent', help: 'Yearly increase applied to this expense.' },
-      { name: 'vat_applicable', label: 'VAT Applicable', kind: 'switch' },
+      { name: 'vat_applicable', label: 'This item is VAT-applicable', kind: 'switch', help: 'Marks whether this expense is subject to VAT at the project default rate (set on the Tax page). It does not set the rate.' },
       { name: 'notes', label: 'Notes', kind: 'textarea', span: 2 },
     ],
   },
