@@ -77,6 +77,35 @@ class PaymentTerms(str, Enum):
         }[self.value]
 
 
+class SellingUnit(str, Enum):
+    """Unit of measure a product/service is priced and sold in.
+
+    "Unit Sales" is not limited to discrete pieces — a manufacturer may sell by
+    weight (Kg, Metric Ton), volume (Litre), packaging (Bottle, Carton), area,
+    time, etc. The selling price is always "price per selected selling unit" and
+    revenue stays quantity x price-per-unit.
+    """
+
+    UNIT = "unit"
+    KG = "kg"
+    GRAM = "gram"
+    METRIC_TON = "metric_ton"
+    LITRE = "litre"
+    MILLILITRE = "millilitre"
+    BOTTLE = "bottle"
+    BOX = "box"
+    CARTON = "carton"
+    BAG = "bag"
+    SQUARE_METER = "square_meter"
+    CUBIC_METER = "cubic_meter"
+    HOUR = "hour"
+    DAY = "day"
+    CONTRACT = "contract"
+    LICENSE = "license"
+    SUBSCRIPTION = "subscription"
+    CUSTOM = "custom"
+
+
 class RefundBasis(str, Enum):
     PERCENT_OF_REVENUE = "percent_of_revenue"
     PERCENT_OF_UNITS = "percent_of_units"

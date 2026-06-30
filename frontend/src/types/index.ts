@@ -23,6 +23,10 @@ export type RevenueType =
 export type PaymentTerms =
   | 'cash' | 'net_15' | 'net_30' | 'net_45' | 'net_60' | 'net_90' | 'custom'
 export type RefundBasis = 'percent_of_revenue' | 'percent_of_units'
+export type SellingUnit =
+  | 'unit' | 'kg' | 'gram' | 'metric_ton' | 'litre' | 'millilitre'
+  | 'bottle' | 'box' | 'carton' | 'bag' | 'square_meter' | 'cubic_meter'
+  | 'hour' | 'day' | 'contract' | 'license' | 'subscription' | 'custom'
 export type Department =
   | 'management' | 'sales' | 'marketing' | 'operations' | 'finance'
   | 'administration' | 'technology' | 'production' | 'customer_support' | 'other'
@@ -73,7 +77,11 @@ export interface ProductService extends EntityBase {
   category?: string | null
   description?: string | null
   revenue_type: RevenueType
+  /** Price per selected selling unit (e.g. $2 per Kg). */
   selling_price: number
+  /** Structured unit of measure; defaults to 'unit' for legacy data. */
+  selling_unit?: SellingUnit | null
+  /** Free-text descriptor / custom unit label when selling_unit = 'custom'. */
   unit_of_sale?: string | null
   launch_date?: string | null
   active: boolean

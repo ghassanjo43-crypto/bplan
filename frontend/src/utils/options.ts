@@ -4,7 +4,7 @@ import type {
   Department, DepreciationMethod, DirectCostCategory, ExpenseCategory,
   ExpenseFrequency, FinancingSource, FixedAssetCategory, PaymentTerms,
   ProjectionFrequency, ProjectionPeriod, RefundBasis, RepaymentType,
-  ReportingStandard, RevenueType, ScenarioType, StartupCostCategory,
+  ReportingStandard, RevenueType, ScenarioType, SellingUnit, StartupCostCategory,
   StockPurchaseCycle, TaxFrequency,
 } from '@/types'
 
@@ -70,6 +70,41 @@ export const refundBasisOptions: Option<RefundBasis>[] = [
   { value: 'percent_of_revenue', label: '% of Revenue' },
   { value: 'percent_of_units', label: '% of Units' },
 ]
+
+// Unit of measure a product is priced and sold in. "Unit Sales" covers weight,
+// volume, packaging, area, time, etc. — not just discrete pieces.
+export const sellingUnitOptions: Option<SellingUnit>[] = [
+  { value: 'unit', label: 'Piece / Unit' },
+  { value: 'kg', label: 'Kg' },
+  { value: 'gram', label: 'Gram' },
+  { value: 'metric_ton', label: 'Metric Ton' },
+  { value: 'litre', label: 'Litre' },
+  { value: 'millilitre', label: 'Millilitre' },
+  { value: 'bottle', label: 'Bottle' },
+  { value: 'box', label: 'Box' },
+  { value: 'carton', label: 'Carton' },
+  { value: 'bag', label: 'Bag' },
+  { value: 'square_meter', label: 'Square meter' },
+  { value: 'cubic_meter', label: 'Cubic meter' },
+  { value: 'hour', label: 'Hour' },
+  { value: 'day', label: 'Day' },
+  { value: 'contract', label: 'Contract' },
+  { value: 'license', label: 'License' },
+  { value: 'subscription', label: 'Subscription' },
+  { value: 'custom', label: 'Custom' },
+]
+
+/** Resolve the concise selling-unit label (mirrors backend ProductService.unit_label). */
+export function sellingUnitLabel(sellingUnit?: SellingUnit | null, unitOfSale?: string | null): string {
+  const su = sellingUnit ?? 'unit'
+  const legacy = (unitOfSale ?? '').trim()
+  if (su === 'custom') return legacy || 'Custom'
+  if (su === 'unit') {
+    if (legacy && !['unit', 'units', 'piece', 'pieces'].includes(legacy.toLowerCase())) return legacy
+    return 'Unit'
+  }
+  return sellingUnitOptions.find((o) => o.value === su)?.label ?? su
+}
 
 export const departmentOptions: Option<Department>[] = [
   { value: 'management', label: 'Management' },
