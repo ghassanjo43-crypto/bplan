@@ -134,6 +134,19 @@ def test_contract_with_duration_ok():
     assert ra.contract_duration_months == 12
 
 
+def test_contract_window_uses_duration_not_end_date():
+    # Start + Duration is the single source of truth: a contradicting end date
+    # (older records may carry one) is ignored for contract/project revenue.
+    ra = RevenueAssumption(product_id="p1", starting_monthly_volume=80,
+                           revenue_timing=RevenueTiming.CONTRACT_PERIOD, contract_duration_months=8,
+                           revenue_end_date=date(2026, 3, 31))
+    s_idx, e_idx = rps.stream_window(_product(), ra, START, N)
+    assert (s_idx, e_idx) == (0, 7)                       # 8 months from start, not 2 from end date
+    q = _seed(ra)
+    assert sum(1 for x in q if x > 0) == 8
+    assert all(abs(q[t] - 10) < 1e-6 for t in range(8))  # 80 / 8 spread evenly
+
+
 def test_legacy_revenue_loads_with_safe_defaults():
     # A legacy stored record has none of the new timing fields.
     ra = RevenueAssumption.model_validate({"product_id": "p1", "starting_monthly_volume": 100})

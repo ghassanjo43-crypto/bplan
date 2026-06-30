@@ -106,6 +106,19 @@ function FieldRenderer({
 }) {
   if (field.visibleWhen && !field.visibleWhen(values)) return null
 
+  // Computed fields are read-only derived displays — no form value/Controller.
+  if (field.kind === 'computed') {
+    const text = field.compute ? field.compute(values) : '—'
+    return (
+      <FormField label={field.label} help={field.help} hint={field.hint} span={field.span ?? 1}>
+        <div className="input" aria-readonly="true"
+          style={{ background: 'var(--surface-2, #f5f6f8)', color: 'var(--text-secondary, #555)', cursor: 'default' }}>
+          {text || '—'}
+        </div>
+      </FormField>
+    )
+  }
+
   const disabled = field.disabledWhen ? field.disabledWhen(values) : false
   const required = field.required || (field.requiredWhen ? field.requiredWhen(values) : false)
 

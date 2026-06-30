@@ -97,6 +97,23 @@ def stream_end_idx(ra, start: date, n: int) -> int:
     return min(n - 1, _mb(start, ed))
 
 
+def stream_window(product, ra, start: date, n: int) -> tuple[int, int]:
+    """Active [start, end] month window for a stream — the single source of truth.
+
+    For CONTRACT_PERIOD the end is derived from start + contract_duration_months
+    (the manual revenue_end_date is intentionally ignored so the two can never
+    contradict). All other modes use revenue_end_date (else the horizon).
+    """
+    s_idx = stream_start_idx(product, ra, start)
+    timing = _enum_value(getattr(ra, "revenue_timing", None), "continuous")
+    if timing == "contract_period":
+        duration = int(getattr(ra, "contract_duration_months", None) or 12)
+        e_idx = min(n - 1, s_idx + duration - 1)
+    else:
+        e_idx = stream_end_idx(ra, start, n)
+    return s_idx, e_idx
+
+
 def seed_quantity(product, ra, n: int, start: date) -> list[float]:
     """Seed a monthly quantity series, shaped by the stream's revenue timing.
 
@@ -110,8 +127,7 @@ def seed_quantity(product, ra, n: int, start: date) -> list[float]:
     if ra is None or not product.active:
         return units
 
-    s_idx = stream_start_idx(product, ra, start)
-    e_idx = stream_end_idx(ra, start, n)
+    s_idx, e_idx = stream_window(product, ra, start, n)
     if s_idx >= n or e_idx < s_idx:
         return units
 
@@ -202,11 +218,10 @@ def resolve_streams(
         d_price = default_price(product, ra)
         d_disc = (ra.discount_percent if ra else 0) or 0
         d_ref = (ra.refund_percent if ra else 0) or 0
-        # Per-stream start (revenue_start_date else product launch) and end
-        # (revenue_end_date else horizon). Enforced here so an end date applies
-        # even to stored/seeded grids. Defaults reproduce legacy behaviour.
-        start_idx = stream_start_idx(product, ra, start)
-        end_idx = stream_end_idx(ra, start, n)
+        # Active window — the single source of truth. Contract/project uses
+        # start + duration; other modes use revenue_end_date (else horizon).
+        # Enforced here so the window applies even to stored/seeded grids.
+        start_idx, end_idx = stream_window(product, ra, start, n)
         rs = ResolvedStream(product=product, ra=ra, cells=cells)
         for t in range(n):
             c = cells[t]

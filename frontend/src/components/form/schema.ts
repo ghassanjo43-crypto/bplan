@@ -7,6 +7,7 @@ export function buildZodSchema(config: FormConfig): z.ZodTypeAny {
   const shape: Record<string, z.ZodTypeAny> = {}
 
   for (const f of allFields(config)) {
+    if (f.kind === 'computed') continue // display-only, not a form value
     shape[f.name] = fieldSchema(f)
   }
   const base = z.object(shape)
@@ -74,6 +75,7 @@ function fieldSchema(f: FieldConfig): z.ZodTypeAny {
 export function defaultsFromConfig(config: FormConfig): Record<string, unknown> {
   const out: Record<string, unknown> = {}
   for (const f of allFields(config)) {
+    if (f.kind === 'computed') continue // display-only, not a form value
     if (f.defaultValue !== undefined) {
       out[f.name] = f.defaultValue
       continue

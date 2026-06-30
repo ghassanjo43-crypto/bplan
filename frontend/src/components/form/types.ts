@@ -10,6 +10,7 @@ export type FieldKind =
   | 'select'
   | 'switch'
   | 'checkbox'
+  | 'computed'
 
 export interface FieldConfig {
   name: string
@@ -33,6 +34,9 @@ export interface FieldConfig {
   /** Cross-field validation. Return an error message to fail, or undefined to
    *  pass (e.g. end date must not precede start date). */
   validateWith?: (value: unknown, values: Record<string, unknown>) => string | undefined
+  /** For kind 'computed': derive a read-only display value from current values
+   *  (e.g. contract end date = start + duration). Not stored or submitted. */
+  compute?: (values: Record<string, unknown>) => string
   /** Static helper text under the field. */
   hint?: string
   /** Grid span (default 1). */
