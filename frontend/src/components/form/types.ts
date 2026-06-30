@@ -30,6 +30,9 @@ export interface FieldConfig {
    *  days only when payment terms = custom). Drives both the asterisk and the
    *  validation rule. */
   requiredWhen?: (values: Record<string, unknown>) => boolean
+  /** Cross-field validation. Return an error message to fail, or undefined to
+   *  pass (e.g. end date must not precede start date). */
+  validateWith?: (value: unknown, values: Record<string, unknown>) => string | undefined
   /** Static helper text under the field. */
   hint?: string
   /** Grid span (default 1). */

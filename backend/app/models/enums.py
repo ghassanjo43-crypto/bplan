@@ -106,6 +106,29 @@ class SellingUnit(str, Enum):
     CUSTOM = "custom"
 
 
+class RevenueTiming(str, Enum):
+    """How a revenue stream recurs over the projection horizon.
+
+    CONTINUOUS is the legacy behaviour (a monthly series from launch, shaped by
+    growth/seasonality) and is the default so existing projects are unchanged.
+    """
+
+    CONTINUOUS = "continuous"          # legacy: monthly series w/ growth & seasonality
+    ONE_TIME = "one_time"              # a single month only
+    MONTHLY_RECURRING = "monthly_recurring"
+    ANNUAL_RECURRING = "annual_recurring"
+    CONTRACT_PERIOD = "contract_period"  # spread a cohort over contract_duration_months
+    SEASONAL = "seasonal"             # shaped by per-month seasonality multipliers
+    CUSTOM = "custom"                 # custom month-by-month schedule (projection grid)
+
+
+class RecognitionMethod(str, Enum):
+    """Whether a periodic amount is smoothed across months or lands in one month."""
+
+    SPREAD = "spread"   # distributed evenly across the months of the period (accrual)
+    LUMP = "lump"       # recognised in the payment/anniversary month (cash timing)
+
+
 class RefundBasis(str, Enum):
     PERCENT_OF_REVENUE = "percent_of_revenue"
     PERCENT_OF_UNITS = "percent_of_units"

@@ -32,6 +32,9 @@ def _mb(start: date, other: date) -> int:
     return (other.year - start.year) * 12 + (other.month - start.month)
 
 
+_PERIOD_MONTHS = {"quarterly": 3, "yearly": 12}
+
+
 def seed_amounts(exp, n: int, start: date, extra_infl: float = 0.0,
                  rent_factor: float = 1.0, marketing_factor: float = 1.0) -> list[float]:
     out = [0.0] * n
@@ -39,12 +42,20 @@ def seed_amounts(exp, n: int, start: date, extra_infl: float = 0.0,
     e_idx = _mb(start, exp.end_date) if exp.end_date else n - 1
     cat = exp.category.value
     scen = rent_factor if cat == "rent" else (marketing_factor if cat in SELLING else 1.0)
+    freq = exp.frequency.value
+    recognition = getattr(exp, "recognition_method", None)
+    recognition = recognition.value if hasattr(recognition, "value") else (recognition or "spread")
     for t in range(max(0, s_idx), min(n, e_idx + 1)):
         base = exp.amount * ((1 + (exp.inflation_percent + extra_infl) / 100.0) ** (t // 12))
-        if exp.frequency.value == "one_time":
+        if freq == "one_time":
             out[t] = (base if t == s_idx else 0.0) * scen
+        elif freq in _PERIOD_MONTHS and recognition == "lump":
+            # Whole period amount lands in the period's first month (cash timing).
+            period = _PERIOD_MONTHS[freq]
+            out[t] = (base if (t - s_idx) % period == 0 else 0.0) * scen
         else:
-            out[t] = base * FREQ_FACTOR[exp.frequency.value] * scen
+            # Default: smoothed across the period (monthly factor) — legacy behaviour.
+            out[t] = base * FREQ_FACTOR[freq] * scen
     return out
 
 

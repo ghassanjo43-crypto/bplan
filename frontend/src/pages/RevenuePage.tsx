@@ -2,7 +2,10 @@ import { PerProductPage } from '@/components/pages/PerProductPage'
 import type { FormConfig } from '@/components/form/types'
 import type { ProductService, RevenueAssumption } from '@/types'
 import { formatNumber, formatPercent } from '@/utils/format'
-import { labelFor, paymentTermsOptions, refundBasisOptions, revenueTypeOptions, sellingUnitLabel } from '@/utils/options'
+import {
+  labelFor, paymentTermsOptions, recognitionMethodOptions, refundBasisOptions,
+  revenueTimingOptions, revenueTypeOptions, sellingUnitLabel,
+} from '@/utils/options'
 
 // First-month quantity means different things per revenue model — the help text
 // adapts so users enter the right unit without a separate field per type.
@@ -26,13 +29,55 @@ function configFor(product: ProductService): FormConfig {
   const unit = sellingUnitLabel(product.selling_unit, product.unit_of_sale)
   return [
     {
+      title: 'Timing & Recurrence',
+      subtitle: 'Whether this revenue is one-time or recurring, and the period over which it appears in the projection.',
+      icon: '◷',
+      fields: [
+        {
+          name: 'revenue_timing', label: 'Revenue Timing / Recurrence', kind: 'select',
+          options: revenueTimingOptions, required: true, defaultValue: 'continuous', span: 2,
+          help: 'How this stream recurs. One-time = a single month. Monthly/Annual recurring repeat each month/year. Contract/project spreads a cohort over a fixed duration. Seasonal uses per-month seasonality multipliers. Custom = edit month-by-month in the projection grid. “Continuous monthly” keeps the legacy behaviour.',
+        },
+        {
+          name: 'revenue_start_date', label: 'Revenue Start Date', kind: 'date',
+          // Required for every timed mode unless the product already provides a
+          // launch date to fall back to. Custom is grid-driven and exempt.
+          requiredWhen: (v) => v.revenue_timing !== 'custom' && !product.launch_date,
+          help: product.launch_date
+            ? 'When this stream first earns revenue. Leave blank to use the product’s launch date.'
+            : 'Required: this product has no launch date, so set when this stream first earns revenue.',
+        },
+        {
+          name: 'revenue_end_date', label: 'Revenue End Date', kind: 'date',
+          visibleWhen: (v) => v.revenue_timing !== 'one_time' && v.revenue_timing !== 'custom',
+          validateWith: (v, vals) =>
+            v && vals.revenue_start_date && String(v) < String(vals.revenue_start_date)
+              ? 'End date cannot be before the start date.'
+              : undefined,
+          help: 'Revenue stops after this month. Leave blank to run to the end of the projection.',
+        },
+        {
+          name: 'contract_duration_months', label: 'Contract Duration', kind: 'number', unit: 'months', min: 1,
+          visibleWhen: (v) => v.revenue_timing === 'contract_period',
+          requiredWhen: (v) => v.revenue_timing === 'contract_period',
+          help: 'Required for contract/project revenue. Number of months (greater than 0) each cohort is spread over.',
+        },
+        {
+          name: 'recognition_method', label: 'Recognition Method', kind: 'select',
+          options: recognitionMethodOptions, defaultValue: 'spread',
+          visibleWhen: (v) => v.revenue_timing === 'annual_recurring' || v.revenue_timing === 'contract_period',
+          help: 'Spread = distribute evenly across the period’s months (accrual). Lump = recognise the whole amount in a single month (cash timing).',
+        },
+      ],
+    },
+    {
       title: 'Volume & Growth',
       subtitle: `How sales quantity starts and scales over time. Quantities are in ${unit} — Revenue = quantity × selling price per ${unit}.`,
       icon: '◴',
       fields: [
         {
           name: 'starting_monthly_volume', label: 'First-month sales quantity', kind: 'number', required: true, unit,
-          help: `${VOLUME_HELP[t] ?? VOLUME_HELP.other} This is the master quantity that drives revenue — you don't enter it again per revenue model.`,
+          help: `${VOLUME_HELP[t] ?? VOLUME_HELP.other} Interpreted per the Revenue Timing above (one-time total, recurring monthly quantity, per-year quantity for annual, or contract cohort size). This is the master quantity that drives revenue.`,
         },
         {
           name: 'annual_growth_rate', label: 'Annual Sales Growth', kind: 'percent', allowNegative: true, max: 1000,
@@ -105,8 +150,8 @@ function configFor(product: ProductService): FormConfig {
       fields: [
         {
           name: 'seasonality_enabled', label: 'Enable Seasonality', kind: 'switch', span: 2,
-          help: 'Apply month-by-month multipliers so revenue reflects seasonal peaks and troughs.',
-          hint: 'Per-month seasonality multipliers can be tuned once enabled.',
+          help: 'Apply month-by-month multipliers so revenue reflects seasonal peaks and troughs. Selecting “Seasonal” as the Revenue Timing also applies these multipliers.',
+          hint: 'Per-month multipliers can be tuned in the revenue projection grid.',
         },
       ],
     },
@@ -125,10 +170,10 @@ export function RevenuePage({ embedded }: { embedded?: boolean } = {}) {
       renderSummary={(a, product) =>
         a ? (
           <div className="stat-grid">
+            <Tile label="Timing" value={labelFor(revenueTimingOptions, a.revenue_timing ?? 'continuous')} />
             <Tile label="Start Volume / mo" value={`${formatNumber(a.starting_monthly_volume)} ${sellingUnitLabel(product.selling_unit, product.unit_of_sale)}`} />
             <Tile label="Annual Growth" value={formatPercent(a.annual_growth_rate)} />
             <Tile label="Payment Terms" value={labelFor(paymentTermsOptions, a.payment_terms)} />
-            <Tile label="Discount" value={formatPercent(a.discount_percent)} />
           </div>
         ) : (
           <p className="muted" style={{ fontSize: 13 }}>

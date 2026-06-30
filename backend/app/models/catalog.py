@@ -17,7 +17,9 @@ from .enums import (
     CostCalculationMethod,
     DirectCostCategory,
     PaymentTerms,
+    RecognitionMethod,
     RefundBasis,
+    RevenueTiming,
     RevenueType,
     SellingUnit,
 )
@@ -101,6 +103,20 @@ class SeasonalityMonth(EntityBase):
 class RevenueAssumption(EntityBase):
     product_id: str = Field(..., description="FK -> ProductService.id")
 
+    # --- Timing / recurrence ------------------------------------------------
+    # CONTINUOUS reproduces the legacy behaviour, so existing projects (which
+    # have no value) are unchanged.
+    revenue_timing: RevenueTiming = RevenueTiming.CONTINUOUS
+    # Start of the stream. When None the projection falls back to the product's
+    # launch_date (single source of truth, no duplication).
+    revenue_start_date: date | None = None
+    # End of the stream (revenue stops after this month). None = runs to horizon.
+    revenue_end_date: date | None = None
+    # For CONTRACT_PERIOD: how many months a contract cohort is spread over.
+    contract_duration_months: int | None = Field(default=None, ge=1, le=600)
+    # For ANNUAL_RECURRING / CONTRACT_PERIOD: spread across months vs lump in one.
+    recognition_method: RecognitionMethod = RecognitionMethod.SPREAD
+
     # Volume / growth
     starting_monthly_volume: float = Field(default=0, ge=0)
     annual_growth_rate: float = Field(default=0, description="percent, may be negative")
@@ -135,6 +151,24 @@ class RevenueAssumption(EntityBase):
     # Collections
     payment_terms: PaymentTerms = PaymentTerms.CASH
     custom_payment_days: int | None = Field(default=None, ge=0, le=365)
+
+    @model_validator(mode="after")
+    def _validate_timing(self) -> "RevenueAssumption":
+        if (
+            self.revenue_start_date
+            and self.revenue_end_date
+            and self.revenue_end_date < self.revenue_start_date
+        ):
+            raise ValueError("Revenue end date cannot be before the start date.")
+        # Contract/project revenue must declare a positive duration to spread the
+        # cohort. revenue_timing is a new field, so no legacy data hits this.
+        if self.revenue_timing == RevenueTiming.CONTRACT_PERIOD and not (
+            self.contract_duration_months and self.contract_duration_months > 0
+        ):
+            raise ValueError(
+                "Contract/project revenue requires contract_duration_months greater than 0."
+            )
+        return self
 
 
 # --------------------------------------------------------------------------

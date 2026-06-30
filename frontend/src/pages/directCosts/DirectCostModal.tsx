@@ -83,11 +83,14 @@ const schema = z
   })
   .superRefine((v, ctx) => {
     const isPercent = PERCENT_METHODS.includes(v.calculation_method as CostCalculationMethod)
+    const isManual = v.calculation_method === 'manual_by_period'
     if (isPercent) {
       if (v.percent == null) ctx.addIssue({ code: 'custom', path: ['percent'], message: 'Enter a percentage' })
       else if (v.percent < 0 || v.percent > 100)
         ctx.addIssue({ code: 'custom', path: ['percent'], message: 'Must be between 0 and 100' })
-    } else {
+    } else if (!isManual) {
+      // Manual-by-period amounts are entered per month in the projection grid,
+      // so no single amount is required here.
       if (v.amount == null) ctx.addIssue({ code: 'custom', path: ['amount'], message: 'Enter an amount' })
       else if (v.amount < 0) ctx.addIssue({ code: 'custom', path: ['amount'], message: 'Must be 0 or positive' })
     }
@@ -104,6 +107,9 @@ const schema = z
       if (Math.abs(sum - 100) > 0.01)
         ctx.addIssue({ code: 'custom', path: ['manual_allocations'], message: `Allocations must total 100% (now ${sum}%)` })
     }
+    // One-time direct costs land in a single month, so they need a date.
+    if (v.calculation_method === 'one_time' && !v.start_date)
+      ctx.addIssue({ code: 'custom', path: ['start_date'], message: 'One-time direct costs need a start date (the month they are incurred).' })
   })
 
 export type DirectCostPrefill = Partial<Pick<Form, 'name' | 'category' | 'calculation_method' | 'cost_behavior'>>
@@ -164,7 +170,7 @@ const MODE_OPTIONS: { value: AssociationMode; label: string }[] = [
   { value: 'one', label: 'One product' },
   { value: 'multiple', label: 'Multiple' },
   { value: 'all', label: 'All products' },
-  { value: 'unassigned', label: 'Unassigned' },
+  { value: 'unassigned', label: 'Independent / unassigned' },
 ]
 
 export function DirectCostModal({
@@ -301,7 +307,7 @@ export function DirectCostModal({
         </SectionCard>
 
         {/* Association */}
-        <SectionCard title="Associated Revenue Stream" subtitle="Link this cost to one, many, all, or no products/services." icon="◫">
+        <SectionCard title="Associated Revenue Stream" subtitle="Linked direct costs are driven by their product’s quantity or revenue. Choose “Independent / unassigned” for a cost that isn’t tied to a specific product (it stays out of cost of sales until assigned)." icon="◫">
           <Controller control={control} name="association_mode" render={({ field }) => (
             <div className="segmented" style={{ marginBottom: targetProducts.length || mode === 'multiple' || mode === 'one' ? 16 : 0 }}>
               {MODE_OPTIONS.map((o) => (
@@ -366,7 +372,7 @@ export function DirectCostModal({
           {mode === 'unassigned' && (
             <div className="banner banner--warning">
               <span className="banner__icon">⚠</span>
-              <div>This cost item will be saved as <strong>unassigned</strong>. Associate it with a product later.</div>
+              <div>This cost is <strong>independent / unassigned</strong> — not linked to any product, so it is excluded from cost of sales until you assign it. For a general overhead, consider Operating Expenses instead.</div>
             </div>
           )}
         </SectionCard>
@@ -385,7 +391,7 @@ export function DirectCostModal({
                   <PercentageInput value={field.value} onChange={field.onChange} error={!!err.percent} />
                 </FormField>
               )} />
-            ) : (
+            ) : method === 'manual_by_period' ? null : (
               <Controller control={control} name="amount" render={({ field }) => (
                 <FormField label="Cost Amount" required error={err.amount?.message}>
                   <CurrencyInput value={field.value} onChange={field.onChange} currency={watch('currency_override') || currency} error={!!err.amount} />
@@ -393,6 +399,12 @@ export function DirectCostModal({
               )} />
             )}
           </div>
+          {method === 'manual_by_period' && (
+            <div className="banner banner--info" style={{ marginTop: 8 }}>
+              <span className="banner__icon">ℹ</span>
+              <div>Manual by period: enter the cost for each month directly in the Direct Costs projection grid. At least one month must have an amount for this cost to appear.</div>
+            </div>
+          )}
         </SectionCard>
 
         {/* Allocation */}
@@ -476,8 +488,11 @@ export function DirectCostModal({
               </FormField>
             )} />
             <Controller control={control} name="start_date" render={({ field }) => (
-              <FormField label="Start Date (optional)" error={err.start_date?.message}
-                help="Leave blank to follow the linked product's launch date. Set a date only to override when the cost starts.">
+              <FormField label={method === 'one_time' ? 'Start Date' : 'Start Date (optional)'}
+                required={method === 'one_time'} error={err.start_date?.message}
+                help={method === 'one_time'
+                  ? 'Required for one-time costs — the month the cost is incurred.'
+                  : "Leave blank to follow the linked product's launch date. Set a date only to override when the cost starts."}>
                 <DateInput value={field.value ?? null} onChange={(v) => field.onChange(v ?? '')} error={!!err.start_date} />
               </FormField>
             )} />

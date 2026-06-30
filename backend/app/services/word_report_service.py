@@ -329,6 +329,13 @@ def add_products_revenue(doc, ctx):
             for p in ctx["products"]]
     add_generic_table(doc, ["Product / Service", "Category", "Revenue type", "Unit", "Price", "Launch", "Status"],
                       rows, numeric_cols=(4,))
+    if ctx.get("revenue_timing"):
+        add_subheading(doc, "Revenue timing & recurrence")
+        add_paragraph_block(doc, ctx["timing_notes"][0], italic=True, size=9)
+        trows = [[r["name"], r["timing"], r["unit"], r["start"], r["end"], r["duration"], r["recognition"], r["payment_terms"]]
+                 for r in ctx["revenue_timing"]]
+        add_generic_table(doc, ["Stream", "Timing / recurrence", "Selling unit", "Start", "End",
+                                "Contract mo.", "Recognition", "Payment terms"], trows)
     add_subheading(doc, "Revenue by stream")
     add_financial_table(doc, ctx["periods"], _cat_rows(ctx["revenue_table"], "Total revenue"), ctx["currency"], total_col=True)
 
@@ -339,8 +346,19 @@ def add_assumptions_sections(doc, ctx):
     add_heading(doc, "4. Projection Assumptions", level=1)
     add_subheading(doc, "Direct cost of sales")
     add_financial_table(doc, ctx["periods"], _cat_rows(ctx["direct_cost_table"], "Total cost of sales"), ctx["currency"], total_col=True)
+    if ctx.get("direct_costs_detail"):
+        add_paragraph_block(doc, ctx["timing_notes"][2], italic=True, size=9)
+        drows = [[c["name"], c["method"], c["association"], c["linked"], c["supplier_terms"], c["start"], c["end"], c["value"]]
+                 for c in ctx["direct_costs_detail"]]
+        add_generic_table(doc, ["Cost item", "Method", "Linked product(s)", "Link", "Supplier terms",
+                                "Start", "End", "Amount / %"], drows)
     add_subheading(doc, "Operating expenses")
     add_financial_table(doc, ctx["periods"], _cat_rows(ctx["opex_table"], "Total operating expenses"), ctx["currency"], total_col=True)
+    if ctx.get("operating_expenses_detail"):
+        add_paragraph_block(doc, ctx["timing_notes"][1], italic=True, size=9)
+        orows = [[e["name"], e["category"], e["timing"], e["recognition"], e["start"], e["end"], e["inflation"]]
+                 for e in ctx["operating_expenses_detail"]]
+        add_generic_table(doc, ["Expense", "Category", "Timing / recurrence", "Recognition", "Start", "End", "Escalation"], orows)
 
     add_heading(doc, "5. Operating Model", level=1)
     add_subheading(doc, "Staffing plan")

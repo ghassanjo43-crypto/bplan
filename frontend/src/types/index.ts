@@ -92,8 +92,19 @@ export interface SeasonalityMonth extends EntityBase {
   adjustment_percent: number
 }
 
+export type RevenueTiming =
+  | 'continuous' | 'one_time' | 'monthly_recurring' | 'annual_recurring'
+  | 'contract_period' | 'seasonal' | 'custom'
+export type RecognitionMethod = 'spread' | 'lump'
+
 export interface RevenueAssumption extends EntityBase {
   product_id: string
+  /** Timing/recurrence; 'continuous' = legacy behaviour (default). */
+  revenue_timing?: RevenueTiming | null
+  revenue_start_date?: string | null
+  revenue_end_date?: string | null
+  contract_duration_months?: number | null
+  recognition_method?: RecognitionMethod | null
   starting_monthly_volume: number
   annual_growth_rate: number
   monthly_growth_rate?: number | null
@@ -126,7 +137,8 @@ export type CostBehavior = 'variable' | 'semi_variable' | 'direct_fixed'
 export type CostCalculationMethod =
   | 'fixed_per_unit' | 'percent_of_revenue' | 'percent_of_selling_price'
   | 'per_customer' | 'per_order' | 'per_contract' | 'per_service_delivery'
-  | 'percent_of_purchase_cost' | 'monthly_allocated' | 'one_time'
+  | 'percent_of_purchase_cost' | 'monthly_allocated' | 'annual_allocated'
+  | 'one_time' | 'manual_by_period'
 export type CostAllocationMethod = 'equal_split' | 'revenue_share' | 'sales_volume' | 'manual'
 
 export interface CostAllocation {
@@ -182,6 +194,8 @@ export interface OperatingExpense extends EntityBase {
   category: ExpenseCategory
   amount: number
   frequency: ExpenseFrequency
+  /** Quarterly/annual: spread (default, legacy) vs lump in the period's month. */
+  recognition_method?: RecognitionMethod | null
   start_date?: string | null
   end_date?: string | null
   inflation_percent: number
