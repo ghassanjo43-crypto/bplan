@@ -62,6 +62,14 @@ export function UserManagementPage() {
   const [open, setOpen] = useState(false)
   const [trialUser, setTrialUser] = useState<ManagedUser | null>(null)
   const [search, setSearch] = useState('')
+  const [highlightEmail, setHighlightEmail] = useState<string | null>(null)
+
+  // Briefly highlight a row (e.g. the email a create just resolved to).
+  const highlight = (email: string) => {
+    const e = email.trim().toLowerCase()
+    setHighlightEmail(e)
+    setTimeout(() => setHighlightEmail((cur) => (cur === e ? null : cur)), 5000)
+  }
 
   const companyName = useMemo(() => {
     const map = new Map((companiesQ.data ?? []).map((c) => [c.id, c.company_name]))
@@ -89,6 +97,17 @@ export function UserManagementPage() {
       />
       <div className="stack">
         <SectionCard>
+          {usersQ.isError ? (
+            <div className="banner banner--warning" style={{ alignItems: 'center' }}>
+              <span className="banner__icon">⚠</span>
+              <div style={{ flex: 1 }}>Could not load users. Please check the API connection and try again.</div>
+              <button className="btn btn--secondary btn--sm" disabled={usersQ.isFetching}
+                onClick={() => { void usersQ.refetch() }}>
+                {usersQ.isFetching ? 'Retrying…' : 'Retry'}
+              </button>
+            </div>
+          ) : (
+          <>
           <input className="input" placeholder="Search by name or email" value={search}
             onChange={(e) => setSearch(e.target.value)} style={{ maxWidth: 320, marginBottom: 12 }} />
           <div className="table-wrap">
@@ -103,8 +122,9 @@ export function UserManagementPage() {
               <tbody>
                 {users.map((u) => {
                   const st = statusOf(u)
+                  const isHit = highlightEmail === u.email.toLowerCase()
                   return (
-                    <tr key={u.id}>
+                    <tr key={u.id} style={isHit ? { background: 'var(--blue-50, #eef4ff)' } : undefined}>
                       <td>{u.full_name || '—'}</td>
                       <td>{u.email}</td>
                       <td><Badge tone={u.role === 'admin' ? 'blue' : 'neutral'}>{u.role}</Badge></td>
@@ -146,12 +166,26 @@ export function UserManagementPage() {
               </tbody>
             </table>
           </div>
+          </>
+          )}
         </SectionCard>
       </div>
 
       {open && <AddUserModal onClose={() => setOpen(false)} onCreate={(body) => create.mutate(body, {
-        onSuccess: () => { notify('User created'); setOpen(false) },
-        onError: (e) => notify((e as Error).message, 'error'),
+        onSuccess: () => { notify('User created'); setOpen(false); void usersQ.refetch(); highlight(body.email) },
+        onError: (e) => {
+          const msg = (e as Error).message
+          if (/already exists/i.test(msg)) {
+            // The user really exists — the list was likely stale/failed. Refresh
+            // and point the admin at the existing row instead of a confusing error.
+            void usersQ.refetch()
+            highlight(body.email)
+            setOpen(false)
+            notify('This email already exists. The user list has been refreshed.')
+          } else {
+            notify(msg, 'error')
+          }
+        },
       })} companies={companiesQ.data ?? []} pending={create.isPending} />}
 
       {trialUser && <TrialModal user={trialUser} onClose={() => setTrialUser(null)} />}
