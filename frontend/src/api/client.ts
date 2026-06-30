@@ -1,5 +1,7 @@
 /* Tiny typed fetch wrapper around the FastAPI backend.
-   The Vite dev server proxies /api -> http://127.0.0.1:8000 (see vite.config). */
+   In local dev the Vite server proxies /api -> VITE_API_PROXY_TARGET
+   (see vite.config / frontend/.env.local). In production the bundle calls the
+   API origin baked in from VITE_API_BASE / VITE_API_URL. */
 
 // Accept either VITE_API_BASE or VITE_API_URL; default to the dev proxy path.
 // Normalize so the value always ends in the backend's /api prefix.
@@ -17,8 +19,10 @@ export class ApiError extends Error {
 }
 
 const BACKEND_DOWN_HINT =
-  'Cannot reach the API server. Make sure the backend is running: ' +
-  'in backend/ run  py -m uvicorn app.main:app --reload  (it should be on http://127.0.0.1:8000).'
+  'Cannot reach the API server. If you are running locally, start the backend ' +
+  '(in backend/: python -m uvicorn app.main:app --reload) and make sure its port ' +
+  'matches VITE_API_PROXY_TARGET in frontend/.env.local. On a deployed site this ' +
+  'usually means the API is starting up or briefly unreachable — please retry in a moment.'
 
 /** Notify the app that the session is gone (AuthProvider listens). */
 function emitUnauthorized() {
