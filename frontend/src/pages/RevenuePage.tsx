@@ -48,6 +48,16 @@ function configFor(product: ProductService): FormConfig {
           name: 'revenue_timing', label: 'Revenue Timing / Recurrence', kind: 'select',
           options: revenueTimingOptions, required: true, defaultValue: 'continuous', span: 2,
           help: 'How this stream recurs. One-time = a single month. Monthly/Annual recurring repeat each month/year. Contract/project spreads a cohort over a fixed duration. Seasonal uses per-month seasonality multipliers. Custom = edit month-by-month in the projection grid. “Continuous monthly” keeps the legacy behaviour.',
+          helpWhen: (v) => {
+            if (v.revenue_timing === 'annual_recurring')
+              return 'Annual recurring / yearly renewal — use this for yearly license fees, annual memberships, yearly maintenance contracts, annual subscriptions, or service retainers. Choose Lump if the full annual amount is recognized once per year, or Spread if the annual amount should be distributed monthly.'
+            const base = 'How this stream recurs. One-time = a single month. Monthly/Annual recurring repeat each month/year. Contract/project spreads a cohort over a fixed duration. Seasonal uses per-month seasonality multipliers. Custom = edit month-by-month in the projection grid. “Continuous monthly” keeps the legacy behaviour.'
+            // Annual recurring fits subscription/licensing/service/maintenance revenue.
+            // For manufacturing unit sales, recommend the simpler timing modes.
+            return t === 'unit_sales'
+              ? `${base} For unit sales, Continuous monthly, Seasonal, Contract/project, or One-time usually fit best; Annual recurring / yearly renewal suits subscriptions, licensing, and maintenance/retainer revenue.`
+              : base
+          },
         },
         {
           name: 'revenue_start_date', label: 'Revenue Start Date', kind: 'date',
@@ -95,6 +105,9 @@ function configFor(product: ProductService): FormConfig {
           options: recognitionMethodOptions, defaultValue: 'spread',
           visibleWhen: (v) => v.revenue_timing === 'annual_recurring' || v.revenue_timing === 'contract_period',
           help: 'Spread = distribute evenly across the period’s months (accrual). Lump = recognise the whole amount in a single month (cash timing).',
+          helpWhen: (v) => v.revenue_timing === 'annual_recurring'
+            ? 'Lump = the full annual amount appears once each year (on the start month). Spread = the annual amount is distributed evenly across the 12 months.'
+            : 'Spread = distribute evenly across the period’s months (accrual). Lump = recognise the whole amount in a single month (cash timing).',
         },
       ],
     },
