@@ -334,6 +334,14 @@ def build_report_context(project: BusinessPlanProject, scenario: str, view: str,
         revenue_table=_cat_table(inc_sections.get("revenue"), currency),
         direct_cost_table=_cat_table(inc_sections.get("cost_of_sales"), currency),
         opex_table=_cat_table(inc_sections.get("operating_expenses"), currency),
+        # Phase 4 — timing / recurrence assumption tables (shared by Word/PDF/Excel)
+        revenue_timing=[
+            _revenue_timing_row(p, next((r for r in project.revenue if r.product_id == p.id), None))
+            for p in project.products
+        ],
+        operating_expenses_detail=[_opex_detail_row(e) for e in project.operating_expenses],
+        direct_costs_detail=[_direct_cost_detail_row(c, project.products) for c in project.direct_costs],
+        timing_notes=TIMING_NOTES,
         staff_by_dept=staff_by_dept,
         staffing=[_staff_row(s) for s in project.staffing],
         fixed_assets=[_asset_row(a, nbv_by_asset.get(a.id, 0)) for a in project.fixed_assets],
@@ -466,10 +474,121 @@ def _overview(project, setup):
     }
 
 
+# --------------------------------------------------------------------------
+# Timing / recurrence presentation (Phase 4 — reports & exports)
+# --------------------------------------------------------------------------
+REVENUE_TIMING_LABELS = {
+    "continuous": "Continuous monthly", "one_time": "One-time", "monthly_recurring": "Monthly recurring",
+    "annual_recurring": "Annual recurring", "contract_period": "Contract / project over fixed period",
+    "seasonal": "Seasonal", "custom": "Custom month-by-month schedule",
+}
+EXPENSE_TIMING_LABELS = {
+    "monthly": "Monthly recurring", "quarterly": "Quarterly", "yearly": "Annual", "one_time": "One-time",
+}
+RECOGNITION_LABELS = {"spread": "Spread / smoothed", "lump": "Lump / cash timing"}
+COST_METHOD_LABELS = {
+    "fixed_per_unit": "Cost per selling unit", "percent_of_revenue": "Percentage of revenue",
+    "percent_of_selling_price": "Percentage of selling price", "per_customer": "Amount per customer",
+    "per_order": "Amount per order", "per_contract": "Fixed amount per contract",
+    "per_service_delivery": "Amount per service delivery", "percent_of_purchase_cost": "Percentage of purchased goods cost",
+    "monthly_allocated": "Fixed direct cost per month", "annual_allocated": "Annual allocated direct cost",
+    "one_time": "One-time direct cost", "manual_by_period": "Manual by period",
+}
+_PAYMENT_TERMS_DAYS = {"cash": 0, "net_15": 15, "net_30": 30, "net_45": 45, "net_60": 60, "net_90": 90}
+
+TIMING_NOTES = [
+    "Revenue projections are driven by timing assumptions including one-time, recurring, "
+    "contract-period, seasonal, or custom schedules.",
+    "Operating expenses may be smoothed (spread) or lumped depending on the recognition method.",
+    "Direct costs may be linked to product quantities/revenue or treated as independent/unassigned.",
+]
+
+
+def _enum_val(v, default=""):
+    if v is None:
+        return default
+    return v.value if hasattr(v, "value") else v
+
+
+def _payment_terms_label(terms_value, custom_days=None):
+    if terms_value == "custom":
+        return f"Custom ({custom_days} days)" if custom_days is not None else "Custom"
+    days = _PAYMENT_TERMS_DAYS.get(terms_value)
+    base = _lbl(terms_value)
+    return f"{base} ({days} days)" if days is not None else base
+
+
 def _product_row(p):
     return {"name": p.name, "category": p.category or "–", "revenue_type": _lbl(p.revenue_type.value),
             "unit": p.unit_label or "–", "price": p.selling_price, "launch": fmt_date(p.launch_date),
             "active": "Active" if p.active else "Inactive", "description": p.description or "–"}
+
+
+def _revenue_timing_row(p, ra):
+    """Per-stream timing/recurrence row. Legacy streams (no assumption or no
+    timing) display the safe defaults: Continuous monthly / Spread / Unit."""
+    timing = _enum_val(getattr(ra, "revenue_timing", None), "continuous")
+    recognition = _enum_val(getattr(ra, "recognition_method", None), "spread")
+    start = fmt_date(getattr(ra, "revenue_start_date", None) if ra else None)
+    if start == "–":
+        start = fmt_date(p.launch_date)
+    duration = getattr(ra, "contract_duration_months", None) if ra else None
+    show_recognition = timing in ("annual_recurring", "contract_period")
+    return {
+        "name": p.name,
+        "timing": REVENUE_TIMING_LABELS.get(timing, "Continuous monthly"),
+        "unit": p.unit_label or "Unit",
+        "start": start,
+        "end": fmt_date(getattr(ra, "revenue_end_date", None) if ra else None),
+        "duration": str(int(duration)) if (timing == "contract_period" and duration) else "–",
+        "recognition": RECOGNITION_LABELS.get(recognition, "Spread / smoothed") if show_recognition else "–",
+        "payment_terms": _payment_terms_label(
+            _enum_val(getattr(ra, "payment_terms", None), "cash") if ra else "cash",
+            getattr(ra, "custom_payment_days", None) if ra else None,
+        ),
+    }
+
+
+def _opex_detail_row(e):
+    freq = _enum_val(e.frequency, "monthly")
+    recognition = _enum_val(getattr(e, "recognition_method", None), "spread")
+    return {
+        "name": e.name,
+        "category": _lbl(_enum_val(e.category)),
+        "timing": EXPENSE_TIMING_LABELS.get(freq, "Monthly recurring"),
+        "recognition": RECOGNITION_LABELS.get(recognition, "Spread / smoothed") if freq in ("quarterly", "yearly") else "–",
+        "start": fmt_date(e.start_date),
+        "end": fmt_date(e.end_date),
+        "inflation": fmt_pct(e.inflation_percent),
+        "amount": e.amount,
+    }
+
+
+def _direct_cost_detail_row(c, products):
+    name_by_id = {p.id: p.name for p in products}
+    if c.apply_to_all:
+        association, linked = "All products", "Linked"
+    elif c.product_ids:
+        association = ", ".join(name_by_id.get(pid, "?") for pid in c.product_ids)
+        linked = "Linked"
+    else:
+        association, linked = "Independent / unassigned", "Independent"
+    method = _enum_val(c.calculation_method)
+    if method in ("percent_of_revenue", "percent_of_selling_price", "percent_of_purchase_cost"):
+        value = fmt_pct(c.percent)
+    else:
+        value = fmt_num(c.amount)
+    return {
+        "name": c.name,
+        "category": _lbl(_enum_val(c.category)),
+        "method": COST_METHOD_LABELS.get(method, _lbl(method)),
+        "association": association,
+        "linked": linked,
+        "supplier_terms": _payment_terms_label(_enum_val(getattr(c, "supplier_payment_terms", None), "net_30")),
+        "start": fmt_date(c.start_date),
+        "end": fmt_date(c.end_date),
+        "value": value,
+    }
 
 
 def _staff_row(s):

@@ -211,6 +211,7 @@ def generate_excel_financial_model(project: BusinessPlanProject, request) -> Exc
     if request.include_checks:
         _checks(b)
     _assumptions_summary(b)
+    _timing_sheet(b)
     _data_dictionary(b)
     _cover(b)  # last so it can move to front
 
@@ -1049,6 +1050,54 @@ def _assumptions_summary(b: _Builder):
     ws.column_dimensions["A"].width = 28
     ws.column_dimensions["B"].width = 16
     ws.column_dimensions["C"].width = 24
+
+
+def _timing_sheet(b: _Builder):
+    """Timing & recurrence assumptions for revenue, opex and direct costs."""
+    ws = b.wb.create_sheet("Timing & Recurrence")
+    ws.cell(row=1, column=1, value="Timing & Recurrence Assumptions").font = Font(bold=True, color=NAVY, size=12)
+    ctx = b.ctx
+    state = {"r": 3}
+
+    def block(title, headers, rows, note):
+        r = state["r"]
+        ws.cell(row=r, column=1, value=title).font = Font(bold=True, color=NAVY)
+        r += 1
+        if note:
+            ws.cell(row=r, column=1, value=note).font = Font(italic=True, color=SLATE)
+            r += 1
+        for j, h in enumerate(headers):
+            c = ws.cell(row=r, column=1 + j, value=h)
+            c.font = F_HEAD
+            c.fill = FILL_HEAD
+            c.border = BORDER
+        r += 1
+        for row in rows:
+            for j, val in enumerate(row):
+                c = ws.cell(row=r, column=1 + j, value=val)
+                c.border = BORDER
+                if j == 0:
+                    c.font = F_LABEL
+            r += 1
+        state["r"] = r + 1  # gap between blocks
+
+    block("Revenue timing & recurrence",
+          ["Stream", "Timing / recurrence", "Selling unit", "Start", "End", "Contract mo.", "Recognition", "Payment terms"],
+          [[x["name"], x["timing"], x["unit"], x["start"], x["end"], x["duration"], x["recognition"], x["payment_terms"]]
+           for x in ctx.get("revenue_timing", [])],
+          ctx["timing_notes"][0])
+    block("Operating expense timing",
+          ["Expense", "Category", "Timing / recurrence", "Recognition", "Start", "End", "Escalation"],
+          [[x["name"], x["category"], x["timing"], x["recognition"], x["start"], x["end"], x["inflation"]]
+           for x in ctx.get("operating_expenses_detail", [])],
+          ctx["timing_notes"][1])
+    block("Direct cost method & association",
+          ["Cost item", "Method", "Linked product(s)", "Link", "Supplier terms", "Start", "End", "Amount / %"],
+          [[x["name"], x["method"], x["association"], x["linked"], x["supplier_terms"], x["start"], x["end"], x["value"]]
+           for x in ctx.get("direct_costs_detail", [])],
+          ctx["timing_notes"][2])
+    for col, w in (("A", 28), ("B", 26), ("C", 18), ("D", 14), ("E", 14), ("F", 12), ("G", 18), ("H", 18)):
+        ws.column_dimensions[col].width = w
 
 
 def _data_dictionary(b: _Builder):

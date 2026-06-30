@@ -223,10 +223,19 @@ def render_report_html(ctx) -> str:
 
     # 3 products & revenue
     prod_rows = [[p["name"], p["category"], p["revenue_type"], p["unit"], p["price"], p["launch"], p["active"]] for p in ctx["products"]]
+    timing_html = ""
+    if ctx.get("revenue_timing"):
+        tr = [[r["name"], r["timing"], r["unit"], r["start"], r["end"], r["duration"], r["recognition"], r["payment_terms"]]
+              for r in ctx["revenue_timing"]]
+        timing_html = (f'<h2>Revenue timing &amp; recurrence</h2>'
+                       f'<p class="note"><em>{ctx["timing_notes"][0]}</em></p>'
+                       + _generic(["Stream", "Timing / recurrence", "Selling unit", "Start", "End",
+                                   "Contract mo.", "Recognition", "Payment terms"], tr))
     parts.append(f"""
     <h1 class="section">3. Products and Revenue Model</h1>
     <h2>Products and services</h2>
     {_generic(["Product / Service", "Category", "Revenue type", "Unit", "Price", "Launch", "Status"], prod_rows, numeric_cols=(4,))}
+    {timing_html}
     <h2>Revenue by stream</h2>
     {_fin_table(P, _cat_rows(ctx["revenue_table"], "Total revenue"), cur, total_col=True)}""")
 
@@ -239,10 +248,25 @@ def render_report_html(ctx) -> str:
         if loans:
             lr = [[l["name"], l["amount"], rd.fmt_pct(l["rate"]), l["term"], l["grace"], l["type"]] for l in loans]
             loan_html = "<h3>Loans</h3>" + _generic(["Loan", "Amount", "Rate", "Term (m)", "Grace (m)", "Repayment"], lr, numeric_cols=(1,))
+        dc_detail_html = ""
+        if ctx.get("direct_costs_detail"):
+            dr = [[c["name"], c["method"], c["association"], c["linked"], c["supplier_terms"], c["start"], c["end"], c["value"]]
+                  for c in ctx["direct_costs_detail"]]
+            dc_detail_html = (f'<p class="note"><em>{ctx["timing_notes"][2]}</em></p>'
+                              + _generic(["Cost item", "Method", "Linked product(s)", "Link", "Supplier terms",
+                                          "Start", "End", "Amount / %"], dr))
+        opex_detail_html = ""
+        if ctx.get("operating_expenses_detail"):
+            orw = [[e["name"], e["category"], e["timing"], e["recognition"], e["start"], e["end"], e["inflation"]]
+                   for e in ctx["operating_expenses_detail"]]
+            opex_detail_html = (f'<p class="note"><em>{ctx["timing_notes"][1]}</em></p>'
+                                + _generic(["Expense", "Category", "Timing / recurrence", "Recognition", "Start", "End", "Escalation"], orw))
         parts.append(f"""
         <h1 class="section">4. Projection Assumptions</h1>
         <h2>Direct cost of sales</h2>{_fin_table(P, _cat_rows(ctx["direct_cost_table"], "Total cost of sales"), cur, total_col=True)}
+        {dc_detail_html}
         <h2>Operating expenses</h2>{_fin_table(P, _cat_rows(ctx["opex_table"], "Total operating expenses"), cur, total_col=True)}
+        {opex_detail_html}
         <h1 class="section">5. Operating Model</h1>
         <h2>Staffing plan</h2>{_generic(["Department", "Role", "Employees", "Monthly salary", "Start date"], staff_rows, numeric_cols=(2, 3))}
         {f'<h2>Total staff cost by year</h2>{_fin_table(P, _cat_rows(ctx["staff_by_dept"], "Total staff cost"), cur, total_col=True)}' if ctx["staff_by_dept"] else ''}
