@@ -479,7 +479,7 @@ def _overview(project, setup):
 # --------------------------------------------------------------------------
 REVENUE_TIMING_LABELS = {
     "continuous": "Continuous monthly", "one_time": "One-time", "monthly_recurring": "Monthly recurring",
-    "annual_recurring": "Annual recurring", "contract_period": "Contract / project over fixed period",
+    "annual_recurring": "Annual recurring / yearly renewal", "contract_period": "Contract / project over fixed period",
     "seasonal": "Seasonal", "custom": "Custom month-by-month schedule",
 }
 EXPENSE_TIMING_LABELS = {

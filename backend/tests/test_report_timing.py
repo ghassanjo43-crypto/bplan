@@ -41,7 +41,7 @@ def test_revenue_timing_row_labels():
     annual = rd._revenue_timing_row(p, RevenueAssumption(
         product_id="p1", revenue_timing=RevenueTiming.ANNUAL_RECURRING,
         recognition_method=RecognitionMethod.LUMP))
-    assert annual["timing"] == "Annual recurring"
+    assert annual["timing"] == "Annual recurring / yearly renewal"
     assert annual["recognition"] == "Lump / cash timing"
 
     contract = rd._revenue_timing_row(p, RevenueAssumption(

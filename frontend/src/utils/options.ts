@@ -76,7 +76,7 @@ export const revenueTimingOptions: Option<RevenueTiming>[] = [
   { value: 'continuous', label: 'Continuous monthly' },
   { value: 'one_time', label: 'One-time' },
   { value: 'monthly_recurring', label: 'Monthly recurring' },
-  { value: 'annual_recurring', label: 'Annual recurring' },
+  { value: 'annual_recurring', label: 'Annual recurring / yearly renewal' },
   { value: 'contract_period', label: 'Contract / project over fixed period' },
   { value: 'seasonal', label: 'Seasonal' },
   { value: 'custom', label: 'Custom month-by-month schedule' },
