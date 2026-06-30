@@ -66,8 +66,16 @@ class AuthorizationMiddleware(BaseHTTPMiddleware):
             return _json(401, "Not authenticated")
         if not user.is_active:
             return _json(401, "Account is disabled")
-        request.state.user = user
         is_admin = user.role == "admin"
+        # Trial enforcement backstop: a non-admin whose trial has expired is
+        # blocked from every protected data route even if their access token was
+        # issued before expiry. /api/auth/* (me, logout, change-password) stays
+        # reachable so the app can read the user and sign out cleanly. Admins are
+        # never affected.
+        if not is_admin and not path.startswith("/api/auth/") and user.trial_expired():
+            from ..services.auth_service import TRIAL_EXPIRED_MESSAGE
+            return _json(403, TRIAL_EXPIRED_MESSAGE)
+        request.state.user = user
 
         parts = [p for p in path.split("/") if p]   # e.g. ['api','projects','id','setup']
 
