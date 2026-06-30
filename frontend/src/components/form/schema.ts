@@ -65,6 +65,10 @@ function fieldSchema(f: FieldConfig): z.ZodTypeAny {
 export function defaultsFromConfig(config: FormConfig): Record<string, unknown> {
   const out: Record<string, unknown> = {}
   for (const f of allFields(config)) {
+    if (f.defaultValue !== undefined) {
+      out[f.name] = f.defaultValue
+      continue
+    }
     switch (f.kind) {
       case 'switch':
       case 'checkbox':

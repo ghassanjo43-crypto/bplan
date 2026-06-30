@@ -2,12 +2,12 @@ import { PerProductPage } from '@/components/pages/PerProductPage'
 import type { FormConfig } from '@/components/form/types'
 import type { ProductService, RevenueAssumption } from '@/types'
 import { formatNumber, formatPercent } from '@/utils/format'
-import { labelFor, paymentTermsOptions, refundBasisOptions, revenueTypeOptions } from '@/utils/options'
+import { labelFor, paymentTermsOptions, refundBasisOptions, revenueTypeOptions, sellingUnitLabel } from '@/utils/options'
 
 // First-month quantity means different things per revenue model — the help text
 // adapts so users enter the right unit without a separate field per type.
 const VOLUME_HELP: Record<string, string> = {
-  unit_sales: 'Units sold in Month 1.',
+  unit_sales: 'Quantity sold in Month 1 — measured in the product’s selling unit (pieces, Kg, grams, metric tons, litres, bottles, cartons, etc.).',
   subscription: 'Active paying subscribers in Month 1.',
   service_contract: 'Contracts expected in Month 1.',
   project_based: 'Contracts / projects expected in Month 1.',
@@ -23,14 +23,15 @@ const overrideHelp = (price: number, label: string) =>
 
 function configFor(product: ProductService): FormConfig {
   const t = product.revenue_type
+  const unit = sellingUnitLabel(product.selling_unit, product.unit_of_sale)
   return [
     {
       title: 'Volume & Growth',
-      subtitle: 'How sales quantity starts and scales over time. This is the single master sales-quantity input.',
+      subtitle: `How sales quantity starts and scales over time. Quantities are in ${unit} — Revenue = quantity × selling price per ${unit}.`,
       icon: '◴',
       fields: [
         {
-          name: 'starting_monthly_volume', label: 'First-month sales quantity', kind: 'number', required: true,
+          name: 'starting_monthly_volume', label: 'First-month sales quantity', kind: 'number', required: true, unit,
           help: `${VOLUME_HELP[t] ?? VOLUME_HELP.other} This is the master quantity that drives revenue — you don't enter it again per revenue model.`,
         },
         {
@@ -124,7 +125,7 @@ export function RevenuePage({ embedded }: { embedded?: boolean } = {}) {
       renderSummary={(a, product) =>
         a ? (
           <div className="stat-grid">
-            <Tile label="Start Volume / mo" value={formatNumber(a.starting_monthly_volume)} />
+            <Tile label="Start Volume / mo" value={`${formatNumber(a.starting_monthly_volume)} ${sellingUnitLabel(product.selling_unit, product.unit_of_sale)}`} />
             <Tile label="Annual Growth" value={formatPercent(a.annual_growth_rate)} />
             <Tile label="Payment Terms" value={labelFor(paymentTermsOptions, a.payment_terms)} />
             <Tile label="Discount" value={formatPercent(a.discount_percent)} />

@@ -23,6 +23,8 @@ export interface FieldConfig {
   min?: number
   max?: number
   step?: number
+  /** Pre-filled value for new items (and for legacy rows missing this field). */
+  defaultValue?: string | number | boolean
   required?: boolean
   /** Conditionally required based on current form values (e.g. custom payment
    *  days only when payment terms = custom). Drives both the asterisk and the

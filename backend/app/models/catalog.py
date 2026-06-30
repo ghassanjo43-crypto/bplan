@@ -19,7 +19,31 @@ from .enums import (
     PaymentTerms,
     RefundBasis,
     RevenueType,
+    SellingUnit,
 )
+
+
+# Human-readable label for each selling unit (used in the UI and reports).
+SELLING_UNIT_LABELS: dict[SellingUnit, str] = {
+    SellingUnit.UNIT: "Unit",
+    SellingUnit.KG: "Kg",
+    SellingUnit.GRAM: "Gram",
+    SellingUnit.METRIC_TON: "Metric Ton",
+    SellingUnit.LITRE: "Litre",
+    SellingUnit.MILLILITRE: "Millilitre",
+    SellingUnit.BOTTLE: "Bottle",
+    SellingUnit.BOX: "Box",
+    SellingUnit.CARTON: "Carton",
+    SellingUnit.BAG: "Bag",
+    SellingUnit.SQUARE_METER: "Square meter",
+    SellingUnit.CUBIC_METER: "Cubic meter",
+    SellingUnit.HOUR: "Hour",
+    SellingUnit.DAY: "Day",
+    SellingUnit.CONTRACT: "Contract",
+    SellingUnit.LICENSE: "License",
+    SellingUnit.SUBSCRIPTION: "Subscription",
+    SellingUnit.CUSTOM: "Custom",
+}
 
 
 # --------------------------------------------------------------------------
@@ -30,10 +54,38 @@ class ProductService(EntityBase):
     category: str | None = Field(default=None, max_length=120)
     description: str | None = Field(default=None, max_length=2000)
     revenue_type: RevenueType
+    # Selling price is always "price per selected selling unit"
+    # (e.g. $2 per Kg, $420 per Metric Ton, $6 per Litre, $1 per Bottle).
     selling_price: float = Field(..., ge=0)
+    # Structured unit of measure the product is priced and sold in. Defaults to
+    # UNIT so existing projects (which have no value) behave as Piece / Unit.
+    selling_unit: SellingUnit = SellingUnit.UNIT
+    # Free-text descriptor. Used as the custom label when selling_unit = CUSTOM,
+    # and retained for legacy products that captured a free-text unit.
     unit_of_sale: str | None = Field(default="unit", max_length=60)
     launch_date: date | None = None
     active: bool = True
+
+    @model_validator(mode="before")
+    @classmethod
+    def _default_selling_unit(cls, data):
+        """Legacy products have no selling_unit; a blank one falls back to UNIT."""
+        if isinstance(data, dict) and data.get("selling_unit") in ("", None):
+            data = {k: v for k, v in data.items() if k != "selling_unit"}
+        return data
+
+    @property
+    def unit_label(self) -> str:
+        """Human-readable selling unit (e.g. 'Kg', 'Metric Ton', or custom)."""
+        if self.selling_unit == SellingUnit.CUSTOM:
+            return (self.unit_of_sale or "").strip() or "Custom"
+        if self.selling_unit == SellingUnit.UNIT:
+            # Preserve any legacy free-text descriptor for old projects.
+            legacy = (self.unit_of_sale or "").strip()
+            if legacy and legacy.lower() not in ("unit", "units", "piece", "pieces"):
+                return legacy
+            return "Unit"
+        return SELLING_UNIT_LABELS.get(self.selling_unit, self.selling_unit.value)
 
 
 # --------------------------------------------------------------------------
