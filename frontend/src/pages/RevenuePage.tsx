@@ -19,6 +19,17 @@ const VOLUME_HELP: Record<string, string> = {
   other: 'Sales quantity in Month 1.',
 }
 
+// Derived end date for contract/project revenue = last day of (start + duration - 1).
+function contractEndDate(start: unknown, durationRaw: unknown): string {
+  const d = Number(durationRaw)
+  if (!start || !Number.isFinite(d) || d < 1) return '—'
+  const dt = new Date(String(start))
+  if (Number.isNaN(dt.getTime())) return '—'
+  dt.setMonth(dt.getMonth() + d) // first month after the contract window…
+  dt.setDate(0) // …then back up to the last day of the final active month
+  return dt.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+}
+
 // Per-model price override: the product Selling Price is the master price; these
 // only override it when a revenue model charges differently.
 const overrideHelp = (price: number, label: string) =>
@@ -48,10 +59,14 @@ function configFor(product: ProductService): FormConfig {
             : 'Required: this product has no launch date, so set when this stream first earns revenue.',
         },
         {
+          // Manual end date for every mode EXCEPT contract/project, where the
+          // end is derived from Start + Duration (single source of truth).
           name: 'revenue_end_date', label: 'Revenue End Date', kind: 'date',
-          visibleWhen: (v) => v.revenue_timing !== 'one_time' && v.revenue_timing !== 'custom',
+          visibleWhen: (v) =>
+            v.revenue_timing !== 'one_time' && v.revenue_timing !== 'custom' && v.revenue_timing !== 'contract_period',
           validateWith: (v, vals) =>
-            v && vals.revenue_start_date && String(v) < String(vals.revenue_start_date)
+            vals.revenue_timing !== 'contract_period' && v && vals.revenue_start_date
+              && String(v) < String(vals.revenue_start_date)
               ? 'End date cannot be before the start date.'
               : undefined,
           help: 'Revenue stops after this month. Leave blank to run to the end of the projection.',
@@ -60,7 +75,14 @@ function configFor(product: ProductService): FormConfig {
           name: 'contract_duration_months', label: 'Contract Duration', kind: 'number', unit: 'months', min: 1,
           visibleWhen: (v) => v.revenue_timing === 'contract_period',
           requiredWhen: (v) => v.revenue_timing === 'contract_period',
-          help: 'Required for contract/project revenue. Number of months (greater than 0) each cohort is spread over.',
+          help: 'Contract duration determines how many months the contract value is spread across. The end date is calculated automatically.',
+        },
+        {
+          // Read-only derived end date for contract/project revenue.
+          name: 'revenue_end_date_calc', label: 'Revenue End Date (calculated)', kind: 'computed',
+          visibleWhen: (v) => v.revenue_timing === 'contract_period',
+          compute: (v) => contractEndDate(v.revenue_start_date, v.contract_duration_months),
+          help: 'Automatically calculated from Revenue Start Date + Contract Duration.',
         },
         {
           name: 'recognition_method', label: 'Recognition Method', kind: 'select',
