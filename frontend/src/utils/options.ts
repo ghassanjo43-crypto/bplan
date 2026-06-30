@@ -158,9 +158,9 @@ export const expenseCategoryOptions: Option<ExpenseCategory>[] = [
 ]
 
 export const expenseFrequencyOptions: Option<ExpenseFrequency>[] = [
-  { value: 'monthly', label: 'Monthly' },
+  { value: 'monthly', label: 'Monthly recurring' },
   { value: 'quarterly', label: 'Quarterly' },
-  { value: 'yearly', label: 'Yearly' },
+  { value: 'yearly', label: 'Annual' },
   { value: 'one_time', label: 'One-time' },
 ]
 
@@ -266,16 +266,18 @@ export const costBehaviorOptions: Option<CostBehavior>[] = [
 ]
 
 export const costCalculationMethodOptions: Option<CostCalculationMethod>[] = [
-  { value: 'fixed_per_unit', label: 'Fixed amount per unit sold' },
-  { value: 'percent_of_revenue', label: '% of revenue' },
-  { value: 'percent_of_selling_price', label: '% of selling price' },
+  { value: 'fixed_per_unit', label: 'Cost per selling unit' },
+  { value: 'percent_of_revenue', label: 'Percentage of revenue' },
+  { value: 'percent_of_selling_price', label: 'Percentage of selling price' },
   { value: 'per_customer', label: 'Amount per customer' },
   { value: 'per_order', label: 'Amount per order' },
-  { value: 'per_contract', label: 'Amount per contract' },
+  { value: 'per_contract', label: 'Fixed amount per contract' },
   { value: 'per_service_delivery', label: 'Amount per service delivery' },
-  { value: 'percent_of_purchase_cost', label: '% of purchased goods cost' },
-  { value: 'monthly_allocated', label: 'Monthly amount (allocated)' },
+  { value: 'percent_of_purchase_cost', label: 'Percentage of purchased goods cost' },
+  { value: 'monthly_allocated', label: 'Fixed direct cost per month' },
+  { value: 'annual_allocated', label: 'Annual allocated direct cost' },
   { value: 'one_time', label: 'One-time direct cost' },
+  { value: 'manual_by_period', label: 'Manual by period (month-by-month grid)' },
 ]
 
 export const costAllocationMethodOptions: Option<CostAllocationMethod>[] = [

@@ -164,7 +164,7 @@ const MODE_OPTIONS: { value: AssociationMode; label: string }[] = [
   { value: 'one', label: 'One product' },
   { value: 'multiple', label: 'Multiple' },
   { value: 'all', label: 'All products' },
-  { value: 'unassigned', label: 'Unassigned' },
+  { value: 'unassigned', label: 'Independent / unassigned' },
 ]
 
 export function DirectCostModal({
@@ -301,7 +301,7 @@ export function DirectCostModal({
         </SectionCard>
 
         {/* Association */}
-        <SectionCard title="Associated Revenue Stream" subtitle="Link this cost to one, many, all, or no products/services." icon="◫">
+        <SectionCard title="Associated Revenue Stream" subtitle="Linked direct costs are driven by their product’s quantity or revenue. Choose “Independent / unassigned” for a cost that isn’t tied to a specific product (it stays out of cost of sales until assigned)." icon="◫">
           <Controller control={control} name="association_mode" render={({ field }) => (
             <div className="segmented" style={{ marginBottom: targetProducts.length || mode === 'multiple' || mode === 'one' ? 16 : 0 }}>
               {MODE_OPTIONS.map((o) => (
@@ -366,7 +366,7 @@ export function DirectCostModal({
           {mode === 'unassigned' && (
             <div className="banner banner--warning">
               <span className="banner__icon">⚠</span>
-              <div>This cost item will be saved as <strong>unassigned</strong>. Associate it with a product later.</div>
+              <div>This cost is <strong>independent / unassigned</strong> — not linked to any product, so it is excluded from cost of sales until you assign it. For a general overhead, consider Operating Expenses instead.</div>
             </div>
           )}
         </SectionCard>

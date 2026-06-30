@@ -5,7 +5,7 @@ import { SummaryCard } from '@/components/SummaryCard'
 import { Badge } from '@/components/ui/Badge'
 import type { ExpenseFrequency, OperatingExpense } from '@/types'
 import { formatCurrency } from '@/utils/format'
-import { expenseCategoryOptions, expenseFrequencyOptions, labelFor } from '@/utils/options'
+import { expenseCategoryOptions, expenseFrequencyOptions, labelFor, recognitionMethodOptions } from '@/utils/options'
 import { useProjectContext } from '@/layouts/ProjectContext'
 
 const config: FormConfig = [
@@ -14,8 +14,18 @@ const config: FormConfig = [
     fields: [
       { name: 'name', label: 'Expense Name', kind: 'text', required: true, span: 2, placeholder: 'e.g. Office Rent' },
       { name: 'category', label: 'Category', kind: 'select', options: expenseCategoryOptions, required: true },
-      { name: 'amount', label: 'Amount', kind: 'currency', required: true },
-      { name: 'frequency', label: 'Frequency', kind: 'select', options: expenseFrequencyOptions, required: true },
+      { name: 'amount', label: 'Amount', kind: 'currency', required: true,
+        help: 'For quarterly/annual costs, enter the full per-period amount (e.g. the annual insurance premium), not a monthly figure.' },
+      {
+        name: 'frequency', label: 'Cost Timing / Recurrence', kind: 'select', options: expenseFrequencyOptions, required: true,
+        help: 'Monthly recurring repeats every month. One-time appears only once (in the start month). Quarterly and Annual can be spread/smoothed across the period or lumped into the period’s month — see Recognition Method.',
+      },
+      {
+        name: 'recognition_method', label: 'Recognition Method', kind: 'select', options: recognitionMethodOptions,
+        defaultValue: 'spread',
+        visibleWhen: (v) => v.frequency === 'quarterly' || v.frequency === 'yearly',
+        help: 'Spread / smoothed distributes the amount evenly across the period’s months (default, accrual). Lump / cash timing recognises the whole amount in the period’s first month.',
+      },
       { name: 'is_fixed', label: 'Fixed Cost', kind: 'switch', help: 'Fixed costs stay constant; variable costs scale with activity.' },
     ],
   },
@@ -46,7 +56,12 @@ export function OperatingExpensesPage({ embedded }: { embedded?: boolean } = {})
     { header: 'Name', cell: (r) => <strong>{r.name}</strong> },
     { header: 'Category', cell: (r) => labelFor(expenseCategoryOptions, r.category) },
     { header: 'Amount', align: 'right', cell: (r) => formatCurrency(r.amount, currency) },
-    { header: 'Frequency', cell: (r) => <Badge tone="neutral">{labelFor(expenseFrequencyOptions, r.frequency)}</Badge> },
+    { header: 'Timing', cell: (r) => (
+      <Badge tone="neutral">
+        {labelFor(expenseFrequencyOptions, r.frequency)}
+        {(r.frequency === 'quarterly' || r.frequency === 'yearly') && r.recognition_method === 'lump' ? ' · Lump' : ''}
+      </Badge>
+    ) },
     { header: 'Monthly Equiv.', align: 'right', cell: (r) => formatCurrency(r.amount * monthlyFactor[r.frequency], currency) },
     { header: 'Type', cell: (r) => <Badge tone={r.is_fixed ? 'blue' : 'amber'}>{r.is_fixed ? 'Fixed' : 'Variable'}</Badge> },
   ]
@@ -60,7 +75,7 @@ export function OperatingExpensesPage({ embedded }: { embedded?: boolean } = {})
       config={config}
       columns={columns}
       emptyIcon="◷"
-      emptyDescription="Capture recurring running costs like rent, software, marketing, and professional fees."
+      emptyDescription="Capture independent overheads like rent, software, marketing, and professional fees. These are general running costs — they are not linked to any product or revenue stream."
       renderSummary={(rows) => {
         const monthly = rows.reduce((s, r) => s + r.amount * monthlyFactor[r.frequency], 0)
         const oneTime = rows.filter((r) => r.frequency === 'one_time').reduce((s, r) => s + r.amount, 0)

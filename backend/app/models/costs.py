@@ -12,6 +12,7 @@ from .enums import (
     ExpenseFrequency,
     FinancingSource,
     FixedAssetCategory,
+    RecognitionMethod,
     StartupCostCategory,
 )
 
@@ -24,6 +25,10 @@ class OperatingExpense(EntityBase):
     category: ExpenseCategory = ExpenseCategory.OTHER
     amount: float = Field(default=0, ge=0)
     frequency: ExpenseFrequency = ExpenseFrequency.MONTHLY
+    # Quarterly/annual amounts are SPREAD (smoothed) across the period by default,
+    # which preserves legacy behaviour. LUMP recognises the whole amount in the
+    # period's first month (cash timing). Ignored for monthly/one-time.
+    recognition_method: RecognitionMethod = RecognitionMethod.SPREAD
     start_date: date | None = None
     end_date: date | None = None
     inflation_percent: float = Field(default=0, description="annual escalation %")
