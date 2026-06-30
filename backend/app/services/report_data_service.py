@@ -538,6 +538,8 @@ def _revenue_timing_row(p, ra):
         "name": p.name,
         "timing": REVENUE_TIMING_LABELS.get(timing, "Continuous monthly"),
         "unit": p.unit_label or "Unit",
+        # One-time revenue is recognised on a fixed date, not a "start" date.
+        "start_label": "Revenue Date" if timing == "one_time" else "Start Date",
         "start": start,
         "end": fmt_date(getattr(ra, "revenue_end_date", None) if ra else None),
         "duration": str(int(duration)) if (timing == "contract_period" and duration) else "–",

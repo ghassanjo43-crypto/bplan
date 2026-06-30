@@ -334,7 +334,7 @@ def add_products_revenue(doc, ctx):
         add_paragraph_block(doc, ctx["timing_notes"][0], italic=True, size=9)
         trows = [[r["name"], r["timing"], r["unit"], r["start"], r["end"], r["duration"], r["recognition"], r["payment_terms"]]
                  for r in ctx["revenue_timing"]]
-        add_generic_table(doc, ["Stream", "Timing / recurrence", "Selling unit", "Start", "End",
+        add_generic_table(doc, ["Stream", "Timing / recurrence", "Selling unit", "Start / Revenue date", "End",
                                 "Contract mo.", "Recognition", "Payment terms"], trows)
     add_subheading(doc, "Revenue by stream")
     add_financial_table(doc, ctx["periods"], _cat_rows(ctx["revenue_table"], "Total revenue"), ctx["currency"], total_col=True)

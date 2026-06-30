@@ -106,11 +106,15 @@ function FieldRenderer({
 }) {
   if (field.visibleWhen && !field.visibleWhen(values)) return null
 
+  // Reactive label / help (fall back to the static values).
+  const label = field.labelWhen ? field.labelWhen(values) : field.label
+  const fieldHelp = field.helpWhen ? field.helpWhen(values) : field.help
+
   // Computed fields are read-only derived displays — no form value/Controller.
   if (field.kind === 'computed') {
     const text = field.compute ? field.compute(values) : '—'
     return (
-      <FormField label={field.label} help={field.help} hint={field.hint} span={field.span ?? 1}>
+      <FormField label={label} help={fieldHelp} hint={field.hint} span={field.span ?? 1}>
         <div className="input" aria-readonly="true"
           style={{ background: 'var(--surface-2, #f5f6f8)', color: 'var(--text-secondary, #555)', cursor: 'default' }}>
           {text || '—'}
@@ -135,9 +139,9 @@ function FieldRenderer({
         if (field.kind === 'switch' || field.kind === 'checkbox') {
           return (
             <FormField
-              label={field.label}
+              label={label}
               required={required}
-              help={field.help}
+              help={fieldHelp}
               hint={hint}
               error={error}
               span={span}
@@ -154,10 +158,10 @@ function FieldRenderer({
 
         return (
           <FormField
-            label={field.label}
+            label={label}
             htmlFor={field.name}
             required={required}
-            help={field.help}
+            help={fieldHelp}
             hint={hint}
             error={error}
             span={span}

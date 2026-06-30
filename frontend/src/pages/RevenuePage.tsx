@@ -54,9 +54,15 @@ function configFor(product: ProductService): FormConfig {
           // Required for every timed mode unless the product already provides a
           // launch date to fall back to. Custom is grid-driven and exempt.
           requiredWhen: (v) => v.revenue_timing !== 'custom' && !product.launch_date,
-          help: product.launch_date
-            ? 'When this stream first earns revenue. Leave blank to use the product’s launch date.'
-            : 'Required: this product has no launch date, so set when this stream first earns revenue.',
+          // One-time revenue happens on a fixed date, so the field is a
+          // "Revenue Date" rather than a start of an ongoing stream.
+          labelWhen: (v) => (v.revenue_timing === 'one_time' ? 'Revenue Date' : 'Revenue Start Date'),
+          helpWhen: (v) => {
+            if (v.revenue_timing === 'one_time') return 'The revenue will be recognized once in this date/month.'
+            if (v.revenue_timing === 'contract_period') return 'Revenue begins from this date and spreads across the contract duration below.'
+            const base = 'Revenue begins from this date and continues according to the selected timing until the end date, if provided.'
+            return product.launch_date ? base : `Required: this product has no launch date. ${base}`
+          },
         },
         {
           // Manual end date for every mode EXCEPT contract/project, where the

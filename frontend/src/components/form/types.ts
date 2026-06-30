@@ -37,6 +37,11 @@ export interface FieldConfig {
   /** For kind 'computed': derive a read-only display value from current values
    *  (e.g. contract end date = start + duration). Not stored or submitted. */
   compute?: (values: Record<string, unknown>) => string
+  /** Reactive label based on current values (e.g. "Revenue Date" for one-time,
+   *  "Revenue Start Date" otherwise). Falls back to `label`. */
+  labelWhen?: (values: Record<string, unknown>) => string
+  /** Reactive help text based on current values. Falls back to `help`. */
+  helpWhen?: (values: Record<string, unknown>) => string
   /** Static helper text under the field. */
   hint?: string
   /** Grid span (default 1). */
