@@ -13,7 +13,7 @@ export function LoginPage() {
   const [busy, setBusy] = useState(false)
 
   if (isAuthenticated) {
-    navigate('/projects', { replace: true })
+    navigate('/guide', { replace: true })
   }
 
   const submit = async (e: React.FormEvent) => {
@@ -22,7 +22,7 @@ export function LoginPage() {
     setBusy(true)
     try {
       await login(email.trim(), password)
-      navigate('/projects', { replace: true })
+      navigate('/guide', { replace: true })
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Sign in failed. Please try again.')
     } finally {
