@@ -4,8 +4,8 @@ import type {
   Department, DepreciationMethod, DirectCostCategory, ExpenseCategory,
   ExpenseFrequency, FinancingSource, FixedAssetCategory, PaymentTerms,
   ProjectionFrequency, ProjectionPeriod, RefundBasis, RepaymentType,
-  ReportingStandard, RevenueType, ScenarioType, SellingUnit, StartupCostCategory,
-  StockPurchaseCycle, TaxFrequency,
+  RecognitionMethod, ReportingStandard, RevenueTiming, RevenueType, ScenarioType,
+  SellingUnit, StartupCostCategory, StockPurchaseCycle, TaxFrequency,
 } from '@/types'
 
 export interface Option<T = string> {
@@ -69,6 +69,23 @@ export const paymentTermsOptions: Option<PaymentTerms>[] = [
 export const refundBasisOptions: Option<RefundBasis>[] = [
   { value: 'percent_of_revenue', label: '% of Revenue' },
   { value: 'percent_of_units', label: '% of Units' },
+]
+
+// How a revenue stream recurs over the projection horizon.
+export const revenueTimingOptions: Option<RevenueTiming>[] = [
+  { value: 'continuous', label: 'Continuous monthly' },
+  { value: 'one_time', label: 'One-time' },
+  { value: 'monthly_recurring', label: 'Monthly recurring' },
+  { value: 'annual_recurring', label: 'Annual recurring' },
+  { value: 'contract_period', label: 'Contract / project over fixed period' },
+  { value: 'seasonal', label: 'Seasonal' },
+  { value: 'custom', label: 'Custom month-by-month schedule' },
+]
+
+// Whether a periodic amount is smoothed across months or lands in one month.
+export const recognitionMethodOptions: Option<RecognitionMethod>[] = [
+  { value: 'spread', label: 'Spread / smoothed' },
+  { value: 'lump', label: 'Lump / cash timing' },
 ]
 
 // Unit of measure a product is priced and sold in. "Unit Sales" covers weight,

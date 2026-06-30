@@ -65,8 +65,8 @@ def _growth_monthly(ra) -> float:
     return 0.0
 
 
-def _season(ra, month: int) -> float:
-    if ra is None or not ra.seasonality_enabled:
+def _season(ra, month: int, force: bool = False) -> float:
+    if ra is None or (not ra.seasonality_enabled and not force):
         return 1.0
     for s in ra.seasonality:
         if s.month == month:
@@ -74,26 +74,93 @@ def _season(ra, month: int) -> float:
     return 1.0
 
 
+def _enum_value(v, default: str) -> str:
+    """Tolerant accessor for an enum-or-str field (handles legacy/raw data)."""
+    if v is None:
+        return default
+    return v.value if hasattr(v, "value") else v
+
+
+def stream_start_idx(product, ra, start: date) -> int:
+    """Month index a stream begins: per-stream start date, else product launch."""
+    sd = (getattr(ra, "revenue_start_date", None) if ra else None) or (
+        product.launch_date if product else None
+    )
+    return max(0, _mb(start, sd)) if sd else 0
+
+
+def stream_end_idx(ra, start: date, n: int) -> int:
+    """Last active month index: per-stream end date, else the horizon end."""
+    ed = getattr(ra, "revenue_end_date", None) if ra else None
+    if not ed:
+        return n - 1
+    return min(n - 1, _mb(start, ed))
+
+
 def seed_quantity(product, ra, n: int, start: date) -> list[float]:
-    """Seed a monthly quantity series from the growth/seasonality helpers."""
+    """Seed a monthly quantity series, shaped by the stream's revenue timing.
+
+    CONTINUOUS (the default) reproduces the legacy growth/seasonality series, so
+    projects without a timing value are unchanged. Other modes shape recurrence:
+    one-time (single month), annual (spread or lump), contract (spread a cohort
+    over its duration), seasonal (force seasonality multipliers). CUSTOM seeds
+    the continuous baseline as a starting point for month-by-month grid edits.
+    """
     units = [0.0] * n
     if ra is None or not product.active:
         return units
-    launch_idx = max(0, _mb(start, product.launch_date)) if product.launch_date else 0
+
+    s_idx = stream_start_idx(product, ra, start)
+    e_idx = stream_end_idx(ra, start, n)
+    if s_idx >= n or e_idx < s_idx:
+        return units
+
     rt = product.revenue_type.value
+    timing = _enum_value(getattr(ra, "revenue_timing", None), "continuous")
+    recognition = _enum_value(getattr(ra, "recognition_method", None), "spread")
     g = _growth_monthly(ra)
     start_vol = ra.starting_monthly_volume or 0
+
+    if timing == "one_time":
+        units[s_idx] = round(start_vol, 4)
+        return units
+
+    if timing == "annual_recurring":
+        annual_g = (ra.annual_growth_rate or 0) / 100.0
+        for t in range(s_idx, e_idx + 1):
+            year = (t - s_idx) // 12
+            yearly_qty = start_vol * ((1 + annual_g) ** year)
+            if recognition == "lump":
+                if (t - s_idx) % 12 == 0:
+                    units[t] = round(yearly_qty, 4)
+            else:
+                units[t] = round(yearly_qty / 12.0, 4)
+        return units
+
+    if timing == "contract_period":
+        duration = int(getattr(ra, "contract_duration_months", None) or 12)
+        if recognition == "lump":
+            units[s_idx] = round(start_vol, 4)
+        else:
+            last = min(e_idx, s_idx + duration - 1)
+            for t in range(s_idx, last + 1):
+                units[t] = round(start_vol / duration, 4)
+        return units
+
+    # continuous / monthly_recurring / seasonal / custom -> growth + seasonality
+    force_season = timing == "seasonal"
     if rt == "subscription":
         churn = (ra.churn_rate or 0) / 100.0
         churn_m = (1 - (1 - churn) ** (1 / 12)) if _annual_billed(product) else churn
         subs = 0.0
-        for t in range(launch_idx, n):
-            subs = start_vol if t == launch_idx else subs * (1 + g) * (1 - churn_m)
+        for t in range(s_idx, e_idx + 1):
+            subs = start_vol if t == s_idx else subs * (1 + g) * (1 - churn_m)
             units[t] = round(subs, 4)
     else:
-        for t in range(launch_idx, n):
-            base = start_vol * ((1 + g) ** (t - launch_idx))
-            units[t] = round(base * _season(ra, (start + relativedelta(months=t)).month), 4)
+        for t in range(s_idx, e_idx + 1):
+            base = start_vol * ((1 + g) ** (t - s_idx))
+            month = (start + relativedelta(months=t)).month
+            units[t] = round(base * _season(ra, month, force_season), 4)
     return units
 
 
@@ -135,14 +202,15 @@ def resolve_streams(
         d_price = default_price(product, ra)
         d_disc = (ra.discount_percent if ra else 0) or 0
         d_ref = (ra.refund_percent if ra else 0) or 0
-        launch_idx = max(0, _mb(start, product.launch_date)) if product.launch_date else 0
-        end_idx = _mb(start, product.launch_date) if False else None  # products have no end date
+        # Per-stream start (revenue_start_date else product launch) and end
+        # (revenue_end_date else horizon). Enforced here so an end date applies
+        # even to stored/seeded grids. Defaults reproduce legacy behaviour.
+        start_idx = stream_start_idx(product, ra, start)
+        end_idx = stream_end_idx(ra, start, n)
         rs = ResolvedStream(product=product, ra=ra, cells=cells)
         for t in range(n):
             c = cells[t]
-            active = c.active and product.active and t >= launch_idx
-            if end_idx is not None and t > end_idx:
-                active = False
+            active = c.active and product.active and start_idx <= t <= end_idx
             price = (c.price_override if c.price_override is not None else d_price) * price_factor
             disc = c.discount_override if c.discount_override is not None else d_disc
             ref = c.refund_override if c.refund_override is not None else d_ref

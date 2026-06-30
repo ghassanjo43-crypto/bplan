@@ -92,8 +92,19 @@ export interface SeasonalityMonth extends EntityBase {
   adjustment_percent: number
 }
 
+export type RevenueTiming =
+  | 'continuous' | 'one_time' | 'monthly_recurring' | 'annual_recurring'
+  | 'contract_period' | 'seasonal' | 'custom'
+export type RecognitionMethod = 'spread' | 'lump'
+
 export interface RevenueAssumption extends EntityBase {
   product_id: string
+  /** Timing/recurrence; 'continuous' = legacy behaviour (default). */
+  revenue_timing?: RevenueTiming | null
+  revenue_start_date?: string | null
+  revenue_end_date?: string | null
+  contract_duration_months?: number | null
+  recognition_method?: RecognitionMethod | null
   starting_monthly_volume: number
   annual_growth_rate: number
   monthly_growth_rate?: number | null
