@@ -23,7 +23,11 @@ class StaffRole(EntityBase):
     bonus_amount: float = Field(default=0, ge=0)
     bonus_percent: float = Field(default=0, ge=0, le=100)
     sales_commission_percent: float = Field(default=0, ge=0, le=100)
-    employer_social_security_percent: float = Field(default=0, ge=0, le=100)
+    # Optional role-specific override of the employer social-security rate.
+    # When None, the projection uses the global Tax & Regulatory default
+    # (``TaxAssumption.employer_social_security_rate``) — see the income
+    # statement payroll build. This avoids asking for the same rate twice.
+    employer_social_security_percent: float | None = Field(default=None, ge=0, le=100)
     gratuity_percent: float = Field(default=0, ge=0, le=100)
 
     active: bool = True

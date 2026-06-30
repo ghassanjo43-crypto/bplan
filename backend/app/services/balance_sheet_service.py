@@ -21,7 +21,8 @@ from datetime import date, datetime, timezone
 from dateutil.relativedelta import relativedelta
 
 from ..models import BusinessPlanProject
-from ..models.enums import DepreciationMethod, RepaymentType
+from ..models.enums import DepreciationMethod, PaymentTerms, RepaymentType
+from . import direct_cost_projection_service as dcp
 from . import fixed_asset_service as fas
 from . import income_statement_service as isvc
 from . import projection_period_service as pps
@@ -173,8 +174,29 @@ def compute_monthly(project: BusinessPlanProject, scenario: str) -> BSModel:
     if wc is None:
         warn.append(("no_working_capital", "warning", "No working capital assumptions — receivables/payables/inventory use defaults."))
 
+    resolved_rev = getattr(ctx, "_resolved_rev", None)
+
     # --- assets (non-cash) ---
-    ar = [credit * rev[t] * ar_days / max(dim[t], 1) for t in range(n)]
+    # Collection timing precedence: a revenue stream's own payment terms drive
+    # its receivables; the Working Capital "default customer collection days" is
+    # used only for streams without specific terms. (See _collection_days.)
+    def _collection_days(ra) -> float:
+        if ra is None:
+            return ar_days
+        terms = ra.payment_terms
+        if terms == PaymentTerms.CUSTOM:
+            return ra.custom_payment_days if ra.custom_payment_days is not None else ar_days
+        days = terms.days
+        return days if days is not None else ar_days
+
+    if resolved_rev:
+        ar = _zeros(n)
+        for rs in resolved_rev.values():
+            days = _collection_days(rs.ra)
+            for t in range(n):
+                ar[t] += credit * rs.net[t] * days / max(dim[t], 1)
+    else:
+        ar = [credit * rev[t] * ar_days / max(dim[t], 1) for t in range(n)]
     inventory_wc = [product_cogs[t] * inv_days / max(dim[t], 1) for t in range(n)]
     if rev and sum(rev) > 0 and ar_days == 0 and credit == 0:
         warn.append(("no_receivable_terms", "info", "Revenue exists but no credit terms — receivables are zero."))
@@ -252,7 +274,30 @@ def compute_monthly(project: BusinessPlanProject, scenario: str) -> BSModel:
     tax_payable = [max(0.0, cum_tax_exp[t] - cum_tax_paid[t]) for t in range(n)]
 
     # --- payables, deposits, accruals, EOSB ---
-    payables = [(cogs[t] + opex[t]) * ap_days / max(dim[t], 1) for t in range(n)]
+    # Payment timing precedence: a direct cost's supplier payment terms drive its
+    # trade payables; the Working Capital "default supplier payment days" covers
+    # operating expenses (and any cost without specific terms). Only costs that
+    # flow into cost of sales (active + assigned) create trade payables, matching
+    # the income statement.
+    def _supplier_days(item) -> float:
+        days = item.supplier_payment_terms.days
+        return days if days is not None else ap_days
+
+    if resolved_rev is not None:
+        resolved_dc = dcp.resolve_items(
+            project, n, start, resolved_rev, 1 + scen.direct_cost / 100.0, scen.inflation
+        )
+        dc_payables = _zeros(n)
+        for rc in resolved_dc.values():
+            item = rc.item
+            if not item.active or (not item.apply_to_all and len(item.product_ids) == 0):
+                continue
+            days = _supplier_days(item)
+            for t in range(n):
+                dc_payables[t] += rc.final[t] * days / max(dim[t], 1)
+        payables = [dc_payables[t] + opex[t] * ap_days / max(dim[t], 1) for t in range(n)]
+    else:
+        payables = [(cogs[t] + opex[t]) * ap_days / max(dim[t], 1) for t in range(n)]
     deposits = [cust_dep * rev[t] for t in range(n)]
     accrued = _zeros(n)  # simplified; payment-delay accruals not modelled yet
     if not project.operating_expenses:

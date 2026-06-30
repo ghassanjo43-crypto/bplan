@@ -107,6 +107,7 @@ function FieldRenderer({
   if (field.visibleWhen && !field.visibleWhen(values)) return null
 
   const disabled = field.disabledWhen ? field.disabledWhen(values) : false
+  const required = field.required || (field.requiredWhen ? field.requiredWhen(values) : false)
 
   return (
     <Controller
@@ -122,7 +123,7 @@ function FieldRenderer({
           return (
             <FormField
               label={field.label}
-              required={field.required}
+              required={required}
               help={field.help}
               hint={hint}
               error={error}
@@ -142,7 +143,7 @@ function FieldRenderer({
           <FormField
             label={field.label}
             htmlFor={field.name}
-            required={field.required}
+            required={required}
             help={field.help}
             hint={hint}
             error={error}

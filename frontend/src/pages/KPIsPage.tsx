@@ -19,7 +19,7 @@ const config: FormConfig = [
     icon: '◰',
     fields: [
       { name: 'min_monthly_revenue_target', label: 'Min. Monthly Revenue', kind: 'currency' },
-      { name: 'min_cash_balance_target', label: 'Min. Cash Balance', kind: 'currency' },
+      { name: 'min_cash_balance_target', label: 'Target minimum cash balance (reporting)', kind: 'currency', help: 'Reporting benchmark only — compared against projected cash. The operating cash reserve that affects funding/cash-flow is set in Working Capital.' },
     ],
   },
   {

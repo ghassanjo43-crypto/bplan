@@ -29,10 +29,10 @@ const config: FormConfig = [
       { name: 'purchase_amount', label: 'Purchase Amount', kind: 'currency', required: true },
       { name: 'purchase_date', label: 'Purchase Date', kind: 'date', required: true },
       { name: 'ready_for_use_date', label: 'Ready-for-use Date', kind: 'date', help: 'Depreciation starts from this date (else purchase date).' },
-      { name: 'financing_source', label: 'Financing Source', kind: 'select', options: financingSourceOptions },
+      { name: 'financing_source', label: 'Financing Source', kind: 'select', options: financingSourceOptions, help: 'Classification only. Actual loan / equity / grant amounts are entered on the Financing page — selecting a source here does not create funding and is not double-counted.' },
       { name: 'supplier_name', label: 'Supplier / Vendor', kind: 'text' },
       { name: 'capitalized', label: 'Capitalized', kind: 'switch', help: 'Capitalised assets are depreciated over their life.' },
-      { name: 'vat_applicable', label: 'VAT Applicable', kind: 'switch' },
+      { name: 'vat_applicable', label: 'This item is VAT-applicable', kind: 'switch', help: 'Marks whether this asset is subject to VAT at the project default rate (set on the Tax page). It does not set the rate.' },
     ],
   },
   {

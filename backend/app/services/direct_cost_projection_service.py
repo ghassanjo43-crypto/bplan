@@ -47,6 +47,21 @@ def _assoc(item, all_ids: list[str]) -> list[str]:
     return all_ids if item.apply_to_all else list(item.product_ids)
 
 
+def _cost_start(item, project) -> date | None:
+    """Effective start date for a direct cost.
+
+    Explicit ``start_date`` wins. When blank and the cost is linked to one or
+    more products/services, it follows the earliest linked product launch date
+    so the launch date stays a single source of truth (instead of re-entering
+    it as a cost start date). Falls back to ``None`` (period start) otherwise.
+    """
+    if item.start_date:
+        return item.start_date
+    ids = [p.id for p in project.products] if item.apply_to_all else list(item.product_ids)
+    launches = [p.launch_date for p in project.products if p.id in ids and p.launch_date]
+    return min(launches) if launches else None
+
+
 @dataclass
 class ResolvedCost:
     item: object
@@ -62,7 +77,8 @@ def _purchased_base(project, resolved_rev, n, start, extra_infl) -> dict[str, li
     for item in project.direct_costs:
         if not item.active or item.calculation_method != CM.FIXED_PER_UNIT:
             continue
-        s_idx = max(0, _mb(start, item.start_date)) if item.start_date else 0
+        sd = _cost_start(item, project)
+        s_idx = max(0, _mb(start, sd)) if sd else 0
         for pid in _assoc(item, all_ids):
             if pid not in base:
                 continue
@@ -94,7 +110,8 @@ def resolve_items(
         cells = get_cells(project, item, n)
         rc = ResolvedCost(item=item, cells=cells)
         assoc = _assoc(item, all_ids)
-        s_idx = max(0, _mb(start, item.start_date)) if item.start_date else 0
+        sd = _cost_start(item, project)
+        s_idx = max(0, _mb(start, sd)) if sd else 0
         e_idx = _mb(start, item.end_date) if item.end_date else n - 1
         for t in range(n):
             c = cells[t]

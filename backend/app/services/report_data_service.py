@@ -468,7 +468,7 @@ def _overview(project, setup):
 
 def _product_row(p):
     return {"name": p.name, "category": p.category or "–", "revenue_type": _lbl(p.revenue_type.value),
-            "unit": p.unit_of_sale or "–", "price": p.selling_price, "launch": fmt_date(p.launch_date),
+            "unit": p.unit_label or "–", "price": p.selling_price, "launch": fmt_date(p.launch_date),
             "active": "Active" if p.active else "Inactive", "description": p.description or "–"}
 
 
