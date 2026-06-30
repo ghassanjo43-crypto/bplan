@@ -72,6 +72,15 @@ def test_annual_total_invariant_to_recognition():
     assert abs(sum(spread) - sum(lump)) < 1e-6                         # same yearly cost, different shape
 
 
+# -- backward compatibility -------------------------------------------------
+def test_legacy_expense_loads_with_spread_default():
+    # A legacy stored record has no recognition_method.
+    exp = OperatingExpense.model_validate({"name": "X", "amount": 12000, "frequency": "yearly"})
+    assert exp.recognition_method == RecognitionMethod.SPREAD
+    q = oep.seed_amounts(exp, N, START)
+    assert all(abs(x - 1000) < 1e-6 for x in q)           # unchanged smoothed behaviour
+
+
 # -- temporary (start/end) still respected ---------------------------------
 def test_temporary_start_end_window():
     q = _seed(_exp(category=ExpenseCategory.RENT, amount=1000, frequency=ExpenseFrequency.MONTHLY,

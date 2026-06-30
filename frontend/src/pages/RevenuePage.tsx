@@ -40,18 +40,27 @@ function configFor(product: ProductService): FormConfig {
         },
         {
           name: 'revenue_start_date', label: 'Revenue Start Date', kind: 'date',
-          help: 'When this stream first earns revenue. Leave blank to use the product’s launch date.',
+          // Required for every timed mode unless the product already provides a
+          // launch date to fall back to. Custom is grid-driven and exempt.
+          requiredWhen: (v) => v.revenue_timing !== 'custom' && !product.launch_date,
+          help: product.launch_date
+            ? 'When this stream first earns revenue. Leave blank to use the product’s launch date.'
+            : 'Required: this product has no launch date, so set when this stream first earns revenue.',
         },
         {
           name: 'revenue_end_date', label: 'Revenue End Date', kind: 'date',
           visibleWhen: (v) => v.revenue_timing !== 'one_time' && v.revenue_timing !== 'custom',
+          validateWith: (v, vals) =>
+            v && vals.revenue_start_date && String(v) < String(vals.revenue_start_date)
+              ? 'End date cannot be before the start date.'
+              : undefined,
           help: 'Revenue stops after this month. Leave blank to run to the end of the projection.',
         },
         {
           name: 'contract_duration_months', label: 'Contract Duration', kind: 'number', unit: 'months', min: 1,
           visibleWhen: (v) => v.revenue_timing === 'contract_period',
           requiredWhen: (v) => v.revenue_timing === 'contract_period',
-          help: 'Number of months each contract/project cohort is spread over.',
+          help: 'Required for contract/project revenue. Number of months (greater than 0) each cohort is spread over.',
         },
         {
           name: 'recognition_method', label: 'Recognition Method', kind: 'select',

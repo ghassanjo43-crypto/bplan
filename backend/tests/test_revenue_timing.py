@@ -121,3 +121,23 @@ def test_end_before_start_rejected():
     with pytest.raises(ValueError):
         RevenueAssumption(product_id="p1", revenue_start_date=date(2026, 6, 1),
                           revenue_end_date=date(2026, 1, 1))
+
+
+def test_contract_requires_duration():
+    with pytest.raises(ValueError):
+        RevenueAssumption(product_id="p1", revenue_timing=RevenueTiming.CONTRACT_PERIOD)
+
+
+def test_contract_with_duration_ok():
+    ra = RevenueAssumption(product_id="p1", revenue_timing=RevenueTiming.CONTRACT_PERIOD,
+                           contract_duration_months=12)
+    assert ra.contract_duration_months == 12
+
+
+def test_legacy_revenue_loads_with_safe_defaults():
+    # A legacy stored record has none of the new timing fields.
+    ra = RevenueAssumption.model_validate({"product_id": "p1", "starting_monthly_volume": 100})
+    assert ra.revenue_timing == RevenueTiming.CONTINUOUS
+    assert ra.revenue_start_date is None and ra.revenue_end_date is None
+    assert ra.contract_duration_months is None
+    assert ra.recognition_method == RecognitionMethod.SPREAD

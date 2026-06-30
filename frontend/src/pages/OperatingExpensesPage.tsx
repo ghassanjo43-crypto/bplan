@@ -26,15 +26,25 @@ const config: FormConfig = [
         visibleWhen: (v) => v.frequency === 'quarterly' || v.frequency === 'yearly',
         help: 'Spread / smoothed distributes the amount evenly across the period’s months (default, accrual). Lump / cash timing recognises the whole amount in the period’s first month.',
       },
+      {
+        name: 'start_date', label: 'Start Date', kind: 'date', required: true,
+        help: 'When this cost starts. For one-time, this is the month it is incurred. Required.',
+      },
+      {
+        name: 'end_date', label: 'End Date (optional)', kind: 'date',
+        validateWith: (v, vals) =>
+          v && vals.start_date && String(v) < String(vals.start_date)
+            ? 'End date cannot be before the start date.'
+            : undefined,
+        help: 'Optional. Set both start and end for a temporary cost that runs for a defined period only.',
+      },
       { name: 'is_fixed', label: 'Fixed Cost', kind: 'switch', help: 'Fixed costs stay constant; variable costs scale with activity.' },
     ],
   },
   {
-    title: 'Schedule & Tax',
+    title: 'Escalation & Tax',
     advanced: true,
     fields: [
-      { name: 'start_date', label: 'Start Date', kind: 'date' },
-      { name: 'end_date', label: 'End Date (optional)', kind: 'date' },
       { name: 'inflation_percent', label: 'Annual Escalation %', kind: 'percent', help: 'Yearly increase applied to this expense.' },
       { name: 'vat_applicable', label: 'This item is VAT-applicable', kind: 'switch', help: 'Marks whether this expense is subject to VAT at the project default rate (set on the Tax page). It does not set the rate.' },
       { name: 'notes', label: 'Notes', kind: 'textarea', span: 2 },

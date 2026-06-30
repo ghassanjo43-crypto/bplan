@@ -160,6 +160,14 @@ class RevenueAssumption(EntityBase):
             and self.revenue_end_date < self.revenue_start_date
         ):
             raise ValueError("Revenue end date cannot be before the start date.")
+        # Contract/project revenue must declare a positive duration to spread the
+        # cohort. revenue_timing is a new field, so no legacy data hits this.
+        if self.revenue_timing == RevenueTiming.CONTRACT_PERIOD and not (
+            self.contract_duration_months and self.contract_duration_months > 0
+        ):
+            raise ValueError(
+                "Contract/project revenue requires contract_duration_months greater than 0."
+            )
         return self
 
 
