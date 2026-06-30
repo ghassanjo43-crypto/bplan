@@ -229,7 +229,7 @@ def render_report_html(ctx) -> str:
               for r in ctx["revenue_timing"]]
         timing_html = (f'<h2>Revenue timing &amp; recurrence</h2>'
                        f'<p class="note"><em>{ctx["timing_notes"][0]}</em></p>'
-                       + _generic(["Stream", "Timing / recurrence", "Selling unit", "Start", "End",
+                       + _generic(["Stream", "Timing / recurrence", "Selling unit", "Start / Revenue date", "End",
                                    "Contract mo.", "Recognition", "Payment terms"], tr))
     parts.append(f"""
     <h1 class="section">3. Products and Revenue Model</h1>

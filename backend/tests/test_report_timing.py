@@ -51,6 +51,22 @@ def test_revenue_timing_row_labels():
     assert contract["duration"] == "6"
 
 
+def test_one_time_labelled_revenue_date():
+    p = _product(launch_date=date(2026, 1, 1))
+    one_time = rd._revenue_timing_row(p, RevenueAssumption(
+        product_id="p1", revenue_timing=RevenueTiming.ONE_TIME, starting_monthly_volume=100))
+    assert one_time["timing"] == "One-time"
+    assert one_time["start_label"] == "Revenue Date"     # not "Start Date"
+    assert one_time["end"] == "–"                          # no end for one-time
+
+    recurring = rd._revenue_timing_row(p, RevenueAssumption(
+        product_id="p1", revenue_timing=RevenueTiming.MONTHLY_RECURRING))
+    assert recurring["start_label"] == "Start Date"
+
+    # legacy / continuous default also uses "Start Date"
+    assert rd._revenue_timing_row(p, None)["start_label"] == "Start Date"
+
+
 def test_revenue_timing_legacy_defaults():
     p = _product(launch_date=date(2026, 1, 1))
     row = rd._revenue_timing_row(p, None)            # legacy stream with no assumption

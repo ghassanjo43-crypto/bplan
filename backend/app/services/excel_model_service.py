@@ -1082,7 +1082,7 @@ def _timing_sheet(b: _Builder):
         state["r"] = r + 1  # gap between blocks
 
     block("Revenue timing & recurrence",
-          ["Stream", "Timing / recurrence", "Selling unit", "Start", "End", "Contract mo.", "Recognition", "Payment terms"],
+          ["Stream", "Timing / recurrence", "Selling unit", "Start / Revenue date", "End", "Contract mo.", "Recognition", "Payment terms"],
           [[x["name"], x["timing"], x["unit"], x["start"], x["end"], x["duration"], x["recognition"], x["payment_terms"]]
            for x in ctx.get("revenue_timing", [])],
           ctx["timing_notes"][0])
