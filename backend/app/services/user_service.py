@@ -1,6 +1,8 @@
 """User management service (admin operations)."""
 from __future__ import annotations
 
+from datetime import timedelta
+
 from ..models import User
 from ..security.passwords import hash_password, validate_password_policy
 from ..storage import get_company_storage, get_user_storage
@@ -18,7 +20,67 @@ def to_public(user: User):
         role=user.role, company_id=user.company_id, is_active=user.is_active,
         must_change_password=user.must_change_password, last_login_at=user.last_login_at,
         created_at=user.created_at, updated_at=user.updated_at,
+        trial_enabled=user.trial_enabled, trial_start_date=user.trial_start_date,
+        trial_end_date=user.trial_end_date, trial_days=user.trial_days,
+        account_status=user.account_status, days_remaining=user.days_remaining(),
     )
+
+
+# --------------------------------------------------------------------------
+# Trial period (admin-managed)
+# --------------------------------------------------------------------------
+def _apply_trial(user: User, enabled: bool, trial_days: int | None, start_date) -> None:
+    """Set or clear a user's trial in place. trial_end_date = start + days."""
+    if not enabled:
+        user.trial_enabled = False
+        user.trial_end_date = None
+        return
+    days = int(trial_days) if trial_days is not None else 0
+    if days <= 0:
+        raise UserError("Trial days must be a positive number.")
+    start = start_date or utcnow()
+    end = start + timedelta(days=days)
+    if end < start:                                   # defensive; days>0 guarantees end>start
+        raise UserError("Trial end date cannot be before the start date.")
+    user.trial_enabled = True
+    user.trial_start_date = start
+    user.trial_days = days
+    user.trial_end_date = end
+
+
+def set_trial(user_id: str, enabled: bool, trial_days: int | None, start_date=None) -> User:
+    store = get_user_storage()
+    user = store.get(user_id)
+    _apply_trial(user, enabled, trial_days, start_date)
+    user.updated_at = utcnow()
+    return store.save(user)
+
+
+def extend_trial(user_id: str, additional_days: int) -> User:
+    """Extend (or revive) a trial by N days from the later of now / current end."""
+    if additional_days <= 0:
+        raise UserError("Extension days must be a positive number.")
+    store = get_user_storage()
+    user = store.get(user_id)
+    now = utcnow()
+    base = user.trial_end_date if (user.trial_end_date and user.trial_end_date > now) else now
+    user.trial_enabled = True
+    if not user.trial_start_date:
+        user.trial_start_date = now
+    user.trial_end_date = base + timedelta(days=additional_days)
+    user.trial_days = (user.trial_days or 0) + additional_days
+    user.updated_at = utcnow()
+    return store.save(user)
+
+
+def end_trial(user_id: str) -> User:
+    """End the trial and convert the user to a full active account (not disabled)."""
+    store = get_user_storage()
+    user = store.get(user_id)
+    user.trial_enabled = False
+    user.trial_end_date = None
+    user.updated_at = utcnow()
+    return store.save(user)
 
 
 def list_users() -> list[User]:
@@ -54,6 +116,8 @@ def create_user(data, *, created_by_id: str | None) -> User:
         must_change_password=data.must_change_password, is_active=True, is_verified=False,
         created_by_user_id=created_by_id,
     )
+    if getattr(data, "trial_enabled", False):
+        _apply_trial(user, True, getattr(data, "trial_days", None), getattr(data, "trial_start_date", None))
     return store.save(user)
 
 

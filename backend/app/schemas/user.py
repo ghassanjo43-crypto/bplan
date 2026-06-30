@@ -18,6 +18,13 @@ class UserPublic(BaseModel):
     last_login_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
+    # Trial period (admin-managed). account_status / days_remaining are derived.
+    trial_enabled: bool = False
+    trial_start_date: datetime | None = None
+    trial_end_date: datetime | None = None
+    trial_days: int | None = None
+    account_status: str = "active"           # active | trial | expired | suspended
+    days_remaining: int | None = None
 
 
 class LoginRequest(BaseModel):
@@ -55,6 +62,10 @@ class UserCreate(BaseModel):
     company_id: str | None = None
     temporary_password: str = Field(..., min_length=8)
     must_change_password: bool = True
+    # Optional trial period created with the user.
+    trial_enabled: bool = False
+    trial_days: int | None = Field(default=None, ge=1, le=3650)
+    trial_start_date: datetime | None = None
 
 
 class UserUpdate(BaseModel):
@@ -63,6 +74,17 @@ class UserUpdate(BaseModel):
     role: str | None = None
     is_active: bool | None = None
     notes: str | None = None
+
+
+class TrialSettings(BaseModel):
+    """Set or replace a user's trial period (admin-only)."""
+    enabled: bool = True
+    trial_days: int | None = Field(default=None, ge=1, le=3650)
+    trial_start_date: datetime | None = None
+
+
+class ExtendTrial(BaseModel):
+    additional_days: int = Field(..., ge=1, le=3650)
 
 
 class CompanyAssignment(BaseModel):

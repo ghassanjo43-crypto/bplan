@@ -13,11 +13,18 @@ from ..utils.ids import utcnow
 logger = logging.getLogger("businessplan.auth")
 
 
+TRIAL_EXPIRED_MESSAGE = (
+    "Your trial period has expired. Please contact the administrator to extend or "
+    "activate your account."
+)
+
+
 class AuthError(Exception):
-    def __init__(self, message: str, *, locked: bool = False):
+    def __init__(self, message: str, *, locked: bool = False, expired: bool = False):
         super().__init__(message)
         self.message = message
         self.locked = locked
+        self.expired = expired      # trial expired (valid credentials, access blocked)
 
 
 def authenticate(email: str, password: str) -> User:
@@ -40,6 +47,10 @@ def authenticate(email: str, password: str) -> User:
             user.failed_login_attempts = 0
         store.save(user)
         raise generic
+    # Credentials are valid. Admins are never subject to trial expiry; a normal
+    # user whose trial has lapsed is told clearly and blocked from signing in.
+    if user.role != "admin" and user.trial_expired(now):
+        raise AuthError(TRIAL_EXPIRED_MESSAGE, expired=True)
     # success
     user.failed_login_attempts = 0
     user.locked_until = None

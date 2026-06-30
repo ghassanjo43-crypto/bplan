@@ -7,7 +7,9 @@ from ..dependencies.auth import require_admin
 from ..models import User
 from ..schemas.user import (
     CompanyAssignment,
+    ExtendTrial,
     ResetPasswordAdmin,
+    TrialSettings,
     UserCreate,
     UserPublic,
     UserUpdate,
@@ -41,7 +43,33 @@ def create_user(body: UserCreate, request: Request, admin: User = Depends(requir
         raise HTTPException(status_code=400, detail=str(exc))
     audit_service.log("user_created", user=admin, entity_type="user", entity_id=user.id,
                       company_id=user.company_id, request=request)
+    if user.trial_enabled:
+        audit_service.log("user_trial_created", user=admin, entity_type="user", entity_id=user.id,
+                          details=f"{user.trial_days} days", request=request)
     return to_public(user)
+
+
+@router.put("/{user_id}/trial", response_model=UserPublic)
+def set_trial(user_id: str, body: TrialSettings, request: Request, admin: User = Depends(require_admin)):
+    u = _guard(user_service.set_trial, user_id, body.enabled, body.trial_days, body.trial_start_date)
+    audit_service.log("user_trial_set", user=admin, entity_type="user", entity_id=user_id,
+                      details=(f"{body.trial_days} days" if body.enabled else "disabled"), request=request)
+    return to_public(u)
+
+
+@router.post("/{user_id}/trial/extend", response_model=UserPublic)
+def extend_trial(user_id: str, body: ExtendTrial, request: Request, admin: User = Depends(require_admin)):
+    u = _guard(user_service.extend_trial, user_id, body.additional_days)
+    audit_service.log("user_trial_extended", user=admin, entity_type="user", entity_id=user_id,
+                      details=f"+{body.additional_days} days", request=request)
+    return to_public(u)
+
+
+@router.post("/{user_id}/trial/end", response_model=UserPublic)
+def end_trial(user_id: str, request: Request, admin: User = Depends(require_admin)):
+    u = _guard(user_service.end_trial, user_id)
+    audit_service.log("user_trial_ended", user=admin, entity_type="user", entity_id=user_id, request=request)
+    return to_public(u)
 
 
 @router.get("/{user_id}", response_model=UserPublic)

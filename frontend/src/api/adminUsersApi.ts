@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from './client'
-import type { CreateUserInput, ManagedUser } from '@/types/auth'
+import type { CreateUserInput, ManagedUser, TrialSettingsInput } from '@/types/auth'
 
 export function useUsers() {
   return useQuery({ queryKey: ['admin-users'], queryFn: () => api.get<ManagedUser[]>('/admin/users') })
@@ -46,4 +46,30 @@ export function useResetUserPassword() {
 export function useDeleteUser() {
   const invalidate = useInvalidate()
   return useMutation({ mutationFn: (id: string) => api.delete<void>(`/admin/users/${id}`), onSuccess: invalidate })
+}
+
+export function useSetTrial() {
+  const invalidate = useInvalidate()
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: TrialSettingsInput }) =>
+      api.put<ManagedUser>(`/admin/users/${id}/trial`, body),
+    onSuccess: invalidate,
+  })
+}
+
+export function useExtendTrial() {
+  const invalidate = useInvalidate()
+  return useMutation({
+    mutationFn: ({ id, additional_days }: { id: string; additional_days: number }) =>
+      api.post<ManagedUser>(`/admin/users/${id}/trial/extend`, { additional_days }),
+    onSuccess: invalidate,
+  })
+}
+
+export function useEndTrial() {
+  const invalidate = useInvalidate()
+  return useMutation({
+    mutationFn: (id: string) => api.post<ManagedUser>(`/admin/users/${id}/trial/end`),
+    onSuccess: invalidate,
+  })
 }

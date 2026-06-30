@@ -60,8 +60,14 @@ def login(body: LoginRequest, response: Response, request: Request):
     try:
         user = auth_service.authenticate(body.email, body.password)
     except AuthError as exc:
-        audit_service.log("login_failed", details=body.email, request=request)
-        code = status.HTTP_423_LOCKED if exc.locked else status.HTTP_401_UNAUTHORIZED
+        audit_service.log("trial_login_blocked" if exc.expired else "login_failed",
+                          details=body.email, request=request)
+        if exc.locked:
+            code = status.HTTP_423_LOCKED
+        elif exc.expired:
+            code = status.HTTP_403_FORBIDDEN
+        else:
+            code = status.HTTP_401_UNAUTHORIZED
         raise HTTPException(status_code=code, detail=exc.message)
     access, refresh = _issue_tokens(response, user)
     audit_service.log("login", user=user, company_id=user.company_id, request=request)
