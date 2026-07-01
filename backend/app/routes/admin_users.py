@@ -46,6 +46,9 @@ def create_user(body: UserCreate, request: Request, admin: User = Depends(requir
     if user.trial_enabled:
         audit_service.log("user_trial_created", user=admin, entity_type="user", entity_id=user.id,
                           details=f"{user.trial_days} days", request=request)
+    if user.demo_company_access:
+        audit_service.log("user_demo_access_granted", user=admin, entity_type="user", entity_id=user.id,
+                          request=request)
     return to_public(user)
 
 
@@ -81,6 +84,10 @@ def get_user(user_id: str, admin: User = Depends(require_admin)):
 def update_user(user_id: str, body: UserUpdate, request: Request, admin: User = Depends(require_admin)):
     user = to_public(_guard(user_service.update_user, user_id, body))
     audit_service.log("user_edited", user=admin, entity_type="user", entity_id=user_id, request=request)
+    if body.demo_company_access is not None:
+        audit_service.log(
+            "user_demo_access_granted" if body.demo_company_access else "user_demo_access_removed",
+            user=admin, entity_type="user", entity_id=user_id, request=request)
     return user
 
 

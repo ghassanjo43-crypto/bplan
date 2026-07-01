@@ -20,6 +20,8 @@ export interface AuthUser {
   trial_days?: number | null
   account_status?: AccountStatus
   days_remaining?: number | null
+  /** Admin-controlled access to the shared AquaPure demo company. */
+  demo_company_access?: boolean
 }
 
 export interface ManagedUser extends AuthUser {}
@@ -34,6 +36,14 @@ export interface CreateUserInput {
   trial_enabled?: boolean
   trial_days?: number | null
   trial_start_date?: string | null
+  demo_company_access?: boolean
+}
+
+export interface UpdateUserInput {
+  full_name?: string
+  role?: Role
+  is_active?: boolean
+  demo_company_access?: boolean
 }
 
 export interface TrialSettingsInput {

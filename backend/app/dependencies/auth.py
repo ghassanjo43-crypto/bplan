@@ -28,8 +28,31 @@ def require_admin(request: Request) -> User:
     return user
 
 
+def can_access_company(user: "User | None", company_id: str) -> bool:
+    """Central company-access rule (used by the middleware and list filters).
+
+    Admins can access everything; a normal user can access their own company,
+    and the shared AquaPure demo company only when an admin has granted them
+    demo access.
+    """
+    if user is None:
+        return False
+    if getattr(user, "role", None) == "admin":
+        return True
+    if getattr(user, "company_id", None) == company_id:
+        return True
+    from ..services.demo import DEMO_COMPANY_ID
+    return company_id == DEMO_COMPANY_ID and bool(getattr(user, "demo_company_access", False))
+
+
 def authorized_company_ids(user: User) -> list[str] | None:
-    """None = all companies (admin); otherwise the single assigned company."""
+    """None = all companies (admin); otherwise the assigned company plus the
+    demo company when demo access has been granted."""
     if user.role == "admin":
         return None
-    return [user.company_id] if user.company_id else []
+    ids = [user.company_id] if user.company_id else []
+    if getattr(user, "demo_company_access", False):
+        from ..services.demo import DEMO_COMPANY_ID
+        if DEMO_COMPANY_ID not in ids:
+            ids.append(DEMO_COMPANY_ID)
+    return ids

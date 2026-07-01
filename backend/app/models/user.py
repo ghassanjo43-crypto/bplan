@@ -27,6 +27,10 @@ class User(TimestampedModel):
     created_by_user_id: str | None = None
     notes: str | None = Field(default=None, max_length=2000)
 
+    # Admin-controlled access to the shared AquaPure demo company. Default False
+    # so existing/normal users don't gain demo access unless an admin grants it.
+    demo_company_access: bool = False
+
     # --- Admin-managed trial period --------------------------------------
     # Defaults keep every existing/legacy user a full active account: trial is
     # off, so trial_expired() is always False for them.

@@ -18,6 +18,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
 from ..config import settings
+from ..dependencies.auth import can_access_company
 from ..models import User
 from ..security.tokens import decode_access_token
 
@@ -96,7 +97,9 @@ class AuthorizationMiddleware(BaseHTTPMiddleware):
                 # editing/deleting a company profile is admin-only
                 if len(parts) == 3 and method in ("PUT", "DELETE") and not is_admin:
                     return _json(403, "Administrator access required")
-                if not is_admin and user.company_id != seg:
+                # A normal user reaches only their own company, or the demo
+                # company when an admin has granted demo access.
+                if not can_access_company(user, seg):
                     return _json(404, "Not found")
         if path == "/api/companies" and method == "POST" and not is_admin:
             return _json(403, "Administrator access required")
@@ -113,7 +116,8 @@ class AuthorizationMiddleware(BaseHTTPMiddleware):
                     return _json(404, "Not found")
                 except Exception:
                     return _json(404, "Not found")
-                if project.company_id != user.company_id:
+                # Own-company projects, or demo-company projects when granted.
+                if not can_access_company(user, project.company_id):
                     return _json(404, "Not found")
 
         return await call_next(request)

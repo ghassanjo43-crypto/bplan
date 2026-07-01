@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from './client'
-import type { CreateUserInput, ManagedUser, TrialSettingsInput } from '@/types/auth'
+import type { CreateUserInput, ManagedUser, TrialSettingsInput, UpdateUserInput } from '@/types/auth'
 
 export function useUsers() {
   return useQuery({ queryKey: ['admin-users'], queryFn: () => api.get<ManagedUser[]>('/admin/users') })
@@ -14,6 +14,15 @@ function useInvalidate() {
 export function useCreateUser() {
   const invalidate = useInvalidate()
   return useMutation({ mutationFn: (body: CreateUserInput) => api.post<ManagedUser>('/admin/users', body), onSuccess: invalidate })
+}
+
+export function useUpdateUser() {
+  const invalidate = useInvalidate()
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: UpdateUserInput }) =>
+      api.put<ManagedUser>(`/admin/users/${id}`, body),
+    onSuccess: invalidate,
+  })
 }
 
 export function useSetUserActive() {

@@ -26,8 +26,9 @@ def list_projects(request: Request, service: ProjectService = Depends(get_servic
     summaries = service.list_summaries()
     user = getattr(request.state, "user", None)
     if user is not None and getattr(user, "role", None) != "admin":
-        cid = getattr(user, "company_id", None)
-        summaries = [s for s in summaries if s.company_id == cid]
+        from ..dependencies.auth import authorized_company_ids
+        allowed = set(authorized_company_ids(user) or [])
+        summaries = [s for s in summaries if s.company_id in allowed]
     return summaries
 
 

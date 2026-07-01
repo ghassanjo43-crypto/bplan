@@ -25,6 +25,7 @@ class UserPublic(BaseModel):
     trial_days: int | None = None
     account_status: str = "active"           # active | trial | expired | suspended
     days_remaining: int | None = None
+    demo_company_access: bool = False
 
 
 class LoginRequest(BaseModel):
@@ -66,6 +67,8 @@ class UserCreate(BaseModel):
     trial_enabled: bool = False
     trial_days: int | None = Field(default=None, ge=1, le=3650)
     trial_start_date: datetime | None = None
+    # Grant access to the shared AquaPure demo company.
+    demo_company_access: bool = False
 
 
 class UserUpdate(BaseModel):
@@ -74,6 +77,7 @@ class UserUpdate(BaseModel):
     role: str | None = None
     is_active: bool | None = None
     notes: str | None = None
+    demo_company_access: bool | None = None
 
 
 class TrialSettings(BaseModel):
