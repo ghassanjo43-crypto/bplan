@@ -1,0 +1,68 @@
+# Reference Blueprint for an ISOLATED staging environment (Revenue Stream Wizard).
+#
+# IMPORTANT
+# - This file is a TEMPLATE. Render only auto-syncs the default `render.yaml`,
+#   so `render.staging.yaml` is NOT applied automatically and has ZERO effect on
+#   the production `bplan2-*` services or the production `render.yaml`.
+# - The production services were created in the Render dashboard; the dashboard
+#   steps in STAGING_DEPLOY.md are the primary, authoritative path.
+# - If you prefer a Blueprint: create a NEW Blueprint, or copy the two services
+#   below into a Blueprint, and confirm each field against Render's current
+#   schema (static-site syntax in particular can change between Render versions).
+#
+# Branch to deploy: feature/revenue-stream-wizard
+# Fill ADMIN_PASSWORD and the real cross-URLs in the dashboard (sync:false below).
+
+services:
+  # ---- Staging API (mirrors bplan2-api) ----
+  - type: web
+    name: bplan-staging-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    branch: feature/revenue-stream-wizard
+    plan: starter                 # a paid plan is required for the disk below
+    healthCheckPath: /health
+    envVars:
+      - key: BP_SEED_ON_STARTUP
+        value: "true"
+      - key: BP_STORAGE_BACKEND
+        value: json
+      - key: BP_DATA_DIR
+        value: /data
+      - key: BP_COOKIE_SECURE
+        value: "true"
+      - key: BP_COOKIE_SAMESITE
+        value: none
+      - key: BP_CORS_ORIGINS
+        value: https://bplan-staging-frontend.onrender.com
+      - key: BP_SEED_DEV_USERS
+        value: "false"
+      - key: BP_ADMIN_RESET
+        value: "false"
+      - key: JWT_SECRET_KEY
+        generateValue: true       # fresh staging secret, not production's
+      - key: JWT_REFRESH_SECRET_KEY
+        generateValue: true
+      - key: ADMIN_EMAIL
+        value: staging-admin@example.com
+      - key: ADMIN_PASSWORD
+        sync: false               # set a strong staging-only value in the dashboard
+    disk:
+      name: bplan-staging-data
+      mountPath: /data
+      sizeGB: 1
+
+  # ---- Staging Frontend (mirrors bplan2-frontend) ----
+  - type: web
+    name: bplan-staging-frontend
+    runtime: static
+    branch: feature/revenue-stream-wizard
+    buildCommand: cd frontend && npm ci && npm run build
+    staticPublishPath: frontend/dist
+    envVars:
+      - key: VITE_API_BASE
+        value: https://bplan-staging-api.onrender.com
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
