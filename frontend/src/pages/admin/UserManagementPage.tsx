@@ -16,6 +16,7 @@ import {
   useResetUserPassword,
   useSetTrial,
   useSetUserActive,
+  useUpdateUser,
   useUsers,
 } from '@/api/adminUsersApi'
 import type { AccountStatus, CreateUserInput, ManagedUser, Role } from '@/types/auth'
@@ -56,6 +57,7 @@ export function UserManagementPage() {
   const companiesQ = useCompanies()
   const create = useCreateUser()
   const setActive = useSetUserActive()
+  const updateUser = useUpdateUser()
   const assign = useAssignCompany()
   const resetPw = useResetUserPassword()
   const del = useDeleteUser()
@@ -114,7 +116,7 @@ export function UserManagementPage() {
             <table className="table">
               <thead>
                 <tr>
-                  <th>Name</th><th>Email</th><th>Role</th><th>Company</th><th>Status</th>
+                  <th>Name</th><th>Email</th><th>Role</th><th>Company</th><th>Demo Access</th><th>Status</th>
                   <th>Trial end</th><th style={{ textAlign: 'right' }}>Days left</th>
                   <th style={{ textAlign: 'right' }}>Actions</th>
                 </tr>
@@ -129,6 +131,9 @@ export function UserManagementPage() {
                       <td>{u.email}</td>
                       <td><Badge tone={u.role === 'admin' ? 'blue' : 'neutral'}>{u.role}</Badge></td>
                       <td>{u.role === 'admin' ? 'All companies' : companyName(u.company_id)}</td>
+                      <td>{u.role === 'admin'
+                        ? <Badge tone="blue">Yes</Badge>
+                        : <Badge tone={u.demo_company_access ? 'green' : 'neutral'}>{u.demo_company_access ? 'Yes' : 'No'}</Badge>}</td>
                       <td><Badge tone={STATUS_TONE[st]} dot>{STATUS_LABEL[st]}</Badge></td>
                       <td>{u.trial_enabled ? fmtDate(u.trial_end_date) : '—'}</td>
                       <td style={{ textAlign: 'right' }}>
@@ -138,6 +143,15 @@ export function UserManagementPage() {
                       </td>
                       <td style={{ textAlign: 'right' }}>
                         <div className="row" style={{ gap: 6, justifyContent: 'flex-end' }}>
+                          {u.role !== 'admin' && (
+                            <button className="btn btn--ghost btn--sm" title="Toggle access to the AquaPure demo company"
+                              onClick={() => updateUser.mutate(
+                                { id: u.id, body: { demo_company_access: !u.demo_company_access } },
+                                { onSuccess: () => notify(u.demo_company_access ? 'Demo access removed' : 'Demo access granted'),
+                                  onError: (e) => notify((e as Error).message, 'error') })}>
+                              {u.demo_company_access ? 'Revoke demo' : 'Grant demo'}
+                            </button>
+                          )}
                           {u.role !== 'admin' && (
                             <button className="btn btn--ghost btn--sm" onClick={() => setTrialUser(u)}>Trial</button>
                           )}
@@ -203,6 +217,7 @@ function AddUserModal({ onClose, onCreate, companies, pending }: {
     email: '', full_name: '', role: 'user', company_id: companies[0]?.id ?? null,
     temporary_password: '', must_change_password: true,
     trial_enabled: false, trial_days: 14, trial_start_date: today(),
+    demo_company_access: false,
   })
   const set = (p: Partial<CreateUserInput>) => setForm((f) => ({ ...f, ...p }))
   return (
@@ -215,6 +230,7 @@ function AddUserModal({ onClose, onCreate, companies, pending }: {
           trial_enabled: form.role === 'admin' ? false : form.trial_enabled,
           trial_days: form.trial_enabled ? form.trial_days : undefined,
           trial_start_date: form.trial_enabled ? form.trial_start_date : undefined,
+          demo_company_access: form.role === 'admin' ? false : form.demo_company_access,
         })}>{pending ? 'Creating…' : 'Create User'}</button>
       </div>
     }>
@@ -240,6 +256,18 @@ function AddUserModal({ onClose, onCreate, companies, pending }: {
           <input type="checkbox" checked={form.must_change_password} onChange={(e) => set({ must_change_password: e.target.checked })} />
           <span style={{ fontSize: 13.5 }}>Must change password on first login</span>
         </label>
+
+        {form.role === 'user' && (
+          <div className="banner banner--info" style={{ marginTop: 4, display: 'block' }}>
+            <label className="row" style={{ gap: 8, alignItems: 'center' }}>
+              <input type="checkbox" checked={!!form.demo_company_access} onChange={(e) => set({ demo_company_access: e.target.checked })} />
+              <strong style={{ fontSize: 13.5 }}>Allow this user to access the AquaPure Smart Filters FZE demo company.</strong>
+            </label>
+            <div className="muted" style={{ fontSize: 12.5, marginTop: 6 }}>
+              Demo access lets the user open the pre-filled AquaPure Smart Filters FZE example company and explore a completed business plan.
+            </div>
+          </div>
+        )}
 
         {form.role === 'user' && (
           <div className="banner banner--info" style={{ marginTop: 4, display: 'block' }}>

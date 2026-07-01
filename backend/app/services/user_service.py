@@ -23,6 +23,7 @@ def to_public(user: User):
         trial_enabled=user.trial_enabled, trial_start_date=user.trial_start_date,
         trial_end_date=user.trial_end_date, trial_days=user.trial_days,
         account_status=user.account_status, days_remaining=user.days_remaining(),
+        demo_company_access=user.demo_company_access,
     )
 
 
@@ -115,6 +116,7 @@ def create_user(data, *, created_by_id: str | None) -> User:
         password_hash=hash_password(data.temporary_password),
         must_change_password=data.must_change_password, is_active=True, is_verified=False,
         created_by_user_id=created_by_id,
+        demo_company_access=bool(getattr(data, "demo_company_access", False)),
     )
     if getattr(data, "trial_enabled", False):
         _apply_trial(user, True, getattr(data, "trial_days", None), getattr(data, "trial_start_date", None))
@@ -133,6 +135,8 @@ def update_user(user_id: str, data) -> User:
         user.role = data.role
     if getattr(data, "is_active", None) is not None:
         user.is_active = data.is_active
+    if getattr(data, "demo_company_access", None) is not None:
+        user.demo_company_access = data.demo_company_access
     user.updated_at = utcnow()
     return store.save(user)
 

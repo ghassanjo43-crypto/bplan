@@ -69,11 +69,12 @@ def my_company(request: Request, svc: CompanyService = Depends(get_company_servi
 
 
 def _authorized_company_ids(request: Request):
-    """None = all (admin); else set of allowed company ids."""
+    """None = all (admin); else set of allowed company ids (own + granted demo)."""
     user = getattr(request.state, "user", None)
     if user is None or getattr(user, "role", None) == "admin":
         return None
-    return {user.company_id} if getattr(user, "company_id", None) else set()
+    from ..dependencies.auth import authorized_company_ids
+    return set(authorized_company_ids(user) or [])
 
 
 @router.post("", response_model=Company, status_code=status.HTTP_201_CREATED)
