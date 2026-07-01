@@ -100,6 +100,39 @@ def seed_initial_admin() -> None:
         logger.info("Seeded initial admin %s from environment configuration.", email)
 
 
+def reset_admin_from_env() -> None:
+    """One-shot admin recovery, gated by BP_ADMIN_RESET.
+
+    Resets the admin identified by ADMIN_EMAIL to ADMIN_PASSWORD (re-activated,
+    promoted to admin, lockout cleared) — or creates it if missing. It touches
+    only that single user record; projects and other users are never modified.
+    Intended for recovering a lost admin password on a host where the datastore
+    has changed. Set BP_ADMIN_RESET=true, deploy once, then set it back to false.
+    """
+    if not settings.admin_reset:
+        return
+    store = get_user_storage()
+    email = settings.admin_email.strip().lower()
+    user = store.get_by_email(email)
+    if user is None:
+        store.save(User(
+            email=email, full_name=settings.admin_full_name, role="admin", company_id=None,
+            password_hash=hash_password(settings.admin_password), is_active=True, is_verified=True,
+        ))
+        logger.warning("BP_ADMIN_RESET: created admin %s from environment. "
+                       "Set BP_ADMIN_RESET=false now.", email)
+        return
+    user.password_hash = hash_password(settings.admin_password)
+    user.role = "admin"
+    user.is_active = True
+    user.must_change_password = False
+    user.failed_login_attempts = 0
+    user.locked_until = None
+    user.updated_at = utcnow()
+    store.save(user)
+    logger.warning("BP_ADMIN_RESET: reset password for admin %s. Set BP_ADMIN_RESET=false now.", email)
+
+
 def seed_dev_users() -> None:
     """Dev-only: a finance user assigned to the AquaPure demo company (for tenant tests)."""
     if not settings.seed_dev_users:

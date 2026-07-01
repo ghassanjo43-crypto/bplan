@@ -1,9 +1,9 @@
 """User + audit-log domain models for authentication and access control."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from ..utils.ids import utcnow
 from .base import TimestampedModel
@@ -34,6 +34,21 @@ class User(TimestampedModel):
     trial_start_date: datetime | None = None
     trial_end_date: datetime | None = None        # source of truth for enforcement
     trial_days: int | None = None                 # the duration the admin chose (informational)
+
+    @field_validator("trial_start_date", "trial_end_date", mode="after")
+    @classmethod
+    def _trial_dates_utc_aware(cls, v: datetime | None) -> datetime | None:
+        """Coerce naive trial dates to UTC-aware.
+
+        The UI's date picker sends ``YYYY-MM-DD``, which parses to a naive
+        datetime. Comparing that against the timezone-aware ``utcnow()`` raised
+        TypeError and 500'd the whole user list. With ``validate_assignment``
+        on the base model this also runs on attribute assignment and on load, so
+        existing naive records self-heal when read.
+        """
+        if v is not None and v.tzinfo is None:
+            return v.replace(tzinfo=timezone.utc)
+        return v
 
     def trial_expired(self, now: datetime | None = None) -> bool:
         """True only when an enabled trial has passed its end date.

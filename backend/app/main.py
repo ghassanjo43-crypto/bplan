@@ -56,6 +56,7 @@ async def lifespan(app: FastAPI):
     try:
         from .services import auth_service
         auth_service.seed_initial_admin()
+        auth_service.reset_admin_from_env()   # one-shot recovery when BP_ADMIN_RESET=true
         auth_service.seed_dev_users()
     except Exception:
         logger.exception("Admin seeding on startup failed")
