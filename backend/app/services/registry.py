@@ -23,6 +23,7 @@ from ..models import (
     ProductService,
     ProjectSetup,
     RevenueAssumption,
+    RevenueStream,
     ScenarioAssumption,
     StaffRole,
     StartupCost,
@@ -49,6 +50,9 @@ COLLECTION_SECTIONS: dict[str, SectionSpec] = {
     for s in [
         SectionSpec("products", "products", "Products & Services", ProductService, True, required=True),
         SectionSpec("revenue", "revenue", "Revenue Assumptions", RevenueAssumption, True),
+        # Auto-CRUD for the Add Revenue Stream wizard. Intentionally NOT added to
+        # SECTION_ORDER so it does not affect completion % or export ordering.
+        SectionSpec("revenue-streams", "revenue_streams", "Revenue Streams", RevenueStream, True),
         SectionSpec("direct-costs", "direct_costs", "Direct Costs / COGS", DirectCostItem, True),
         SectionSpec("staffing", "staffing", "Staffing Plan", StaffRole, True),
         SectionSpec("operating-expenses", "operating_expenses", "Operating Expenses", OperatingExpense, True),

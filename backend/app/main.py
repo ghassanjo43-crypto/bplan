@@ -127,6 +127,10 @@ app.include_router(fixed_assets_router, prefix=settings.api_prefix)
 app.include_router(reports_router, prefix=settings.api_prefix)
 app.include_router(text_plan_router, prefix=settings.api_prefix)
 app.include_router(exports_router, prefix=settings.api_prefix)
+# Revenue-stream forecast (registered before the generic section router so its
+# static sub-path resolves ahead of /revenue-streams/{item_id}).
+from .routes.revenue_streams import router as revenue_streams_router  # noqa: E402
+app.include_router(revenue_streams_router, prefix=settings.api_prefix)
 for section_router in build_section_routers():
     app.include_router(section_router, prefix=settings.api_prefix)
 

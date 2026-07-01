@@ -8,6 +8,7 @@ import type { ProjectionSection } from '@/types/projection'
 import { RevenuePage } from './RevenuePage'
 import { DirectCostsPage } from './DirectCostsPage'
 import { OperatingExpensesPage } from './OperatingExpensesPage'
+import { RevenueStreamsSection } from '@/components/revenueStream/RevenueStreamWizard'
 
 function Workspace({
   slug,
@@ -57,7 +58,7 @@ export function RevenueWorkspace() {
       section="revenue"
       setupLabel="Revenue Setup"
       projectionLabel="Revenue Projection"
-      setup={<RevenuePage embedded />}
+      setup={<div className="stack"><RevenueStreamsSection /><RevenuePage embedded /></div>}
     />
   )
 }

@@ -129,6 +129,27 @@ class RecognitionMethod(str, Enum):
     LUMP = "lump"       # recognised in the payment/anniversary month (cash timing)
 
 
+class RevenueStreamType(str, Enum):
+    """Forecast types for the Add Revenue Stream wizard."""
+
+    UNIT_SALES = "unit_sales"            # revenue = units x unit_price
+    BILLABLE_HOURS = "billable_hours"    # revenue = hours x hourly_rate
+    RECURRING_CHARGES = "recurring_charges"  # signups + churn + recurring charge (+ upfront)
+    REVENUE_ONLY = "revenue_only"        # total revenue entered directly
+
+
+class ForecastInputMethod(str, Enum):
+    """How a wizard input varies over the forecast."""
+
+    CONSTANT = "constant"   # one value applied to every period
+    VARYING = "varying"     # an explicit value per month
+
+
+class BillingFrequency(str, Enum):
+    MONTHLY = "monthly"
+    YEARLY = "yearly"
+
+
 class RefundBasis(str, Enum):
     PERCENT_OF_REVENUE = "percent_of_revenue"
     PERCENT_OF_UNITS = "percent_of_units"

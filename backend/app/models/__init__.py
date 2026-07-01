@@ -33,6 +33,7 @@ from .catalog import (
     RevenueAssumption,
     SeasonalityMonth,
 )
+from .revenue_stream import RevenueStream
 from .people import StaffRole
 from .costs import FixedAsset, OperatingExpense, StartupCost
 from .capital import (
@@ -88,6 +89,7 @@ __all__ = [
     "ProjectSetup",
     "ProductService",
     "RevenueAssumption",
+    "RevenueStream",
     "SeasonalityMonth",
     "CostAllocation",
     "DirectCostItem",

@@ -97,6 +97,43 @@ export type RevenueTiming =
   | 'contract_period' | 'seasonal' | 'custom'
 export type RecognitionMethod = 'spread' | 'lump'
 
+export type RevenueStreamType = 'unit_sales' | 'billable_hours' | 'recurring_charges' | 'revenue_only'
+export type ForecastInputMethod = 'constant' | 'varying'
+export type BillingFrequency = 'monthly' | 'yearly'
+
+export interface RevenueStream extends EntityBase {
+  name: string
+  stream_type: RevenueStreamType
+  active: boolean
+  quantity_method: ForecastInputMethod
+  quantity_constant: number
+  quantity_monthly: number[]
+  price_method: ForecastInputMethod
+  price_constant: number
+  price_monthly: number[]
+  initial_customers: number
+  signups_method: ForecastInputMethod
+  signups_constant: number
+  signups_monthly: number[]
+  recurring_charge: number
+  billing_frequency: BillingFrequency
+  upfront_fee: number
+  churn_rate_percent: number
+  revenue_method: ForecastInputMethod
+  revenue_constant: number
+  revenue_monthly: number[]
+}
+
+export interface RevenueStreamForecast {
+  project_id: string
+  currency: string
+  view: 'monthly' | 'annual'
+  periods: string[]
+  rows: { id: string; name: string; stream_type: RevenueStreamType; values: number[]; total: number; active: boolean }[]
+  totals_by_period: number[]
+  grand_total: number
+}
+
 export interface RevenueAssumption extends EntityBase {
   product_id: string
   /** Timing/recurrence; 'continuous' = legacy behaviour (default). */

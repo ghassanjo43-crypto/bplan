@@ -660,6 +660,24 @@ def _compute(project: BusinessPlanProject, scenario: str) -> tuple[Ctx, dict]:
             values_by_period=pm.revenue, total=sum(pm.revenue),
             note=pm.product.revenue_type.value.replace("_", " "),
         ))
+
+    # Add Revenue Stream wizard output (additive; empty list -> no change, so
+    # existing projects are unaffected). Each stream maps to an IFRS line and is
+    # scaled by the scenario sales-volume adjustment like product revenue.
+    from . import revenue_stream_service as rss
+    vol_factor = 1 + ctx.scen.sales_volume / 100.0
+    for stream in getattr(project, "revenue_streams", []):
+        if not getattr(stream, "active", True):
+            continue
+        monthly = [round(v * vol_factor, 4) for v in rss.compute_monthly(stream, n)]
+        key = rss.IFRS_LINE.get(stream.stream_type.value, "other_revenue")
+        rev_lines[key] = _add(rev_lines[key], monthly)
+        rev_children[key].append(IncomeStatementLineItem(
+            key=f"rs_{stream.id}", label=stream.name, classification="revenue",
+            values_by_period=monthly, total=sum(monthly),
+            note="revenue stream · " + stream.stream_type.value.replace("_", " "),
+        ))
+
     total_revenue = _zeros(n)
     for key in rev_lines:
         total_revenue = _add(total_revenue, rev_lines[key])
