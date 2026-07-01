@@ -128,6 +128,17 @@ On the **frontend service** (`bplan2-frontend`), keep `VITE_API_BASE` (or
 `VITE_API_URL`) set to the API origin, e.g. `https://bplan2-api.onrender.com`
 (this is already configured and verified working).
 
+### Recovering a lost admin password (safe)
+Changing `ADMIN_EMAIL` / `ADMIN_PASSWORD` **only seeds a new admin when none
+exists** — it does **not** change an existing admin's password. To reset a lost
+admin password without touching projects or other users:
+
+1. Set `ADMIN_EMAIL` + `ADMIN_PASSWORD` (the new password) on `bplan2-api`.
+2. Set **`BP_ADMIN_RESET=true`** and redeploy/restart **once**.
+3. On boot the app resets that admin's password (and re-activates/promotes it),
+   or creates it if missing — **only that one user record is touched**.
+4. **Set `BP_ADMIN_RESET=false`** again so it doesn't run on every boot.
+
 ### 4. Why code changes alone won't fix this
 The 401s and disappearing data are a **storage-durability** problem, not an
 application bug — the create/list logic already reads and writes the same store

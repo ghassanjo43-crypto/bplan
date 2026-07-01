@@ -16,7 +16,7 @@ from app.main import app
 from app.models import Company, User
 from app.security.passwords import hash_password
 from app.security.tokens import create_access_token
-from app.services import user_service
+from app.services import auth_service, user_service
 from app.storage import get_company_storage, get_user_storage
 from app.utils.ids import utcnow
 
@@ -195,3 +195,69 @@ def test_only_admin_can_set_trial(env, auth_on):
         r = c.put(f"/api/admin/users/{env['plain'].id}/trial", headers=_bearer(user_t),
                   json={"enabled": True, "trial_days": 7})
         assert r.status_code == 403
+
+
+# -- regression: naive trial dates must not crash to_public / the user list ----
+def test_naive_trial_date_does_not_crash(env, auth_on):
+    from datetime import datetime
+    # A date-only value from the UI parses to a NAIVE datetime; this used to
+    # 500 the whole list via to_public -> days_remaining.
+    u = user_service.set_trial(env["plain"].id, True, 14, datetime(2026, 6, 30))
+    assert u.trial_end_date.tzinfo is not None            # coerced to aware
+    assert user_service.to_public(u).days_remaining is not None
+    with TestClient(app) as c:
+        admin_t = _token(c, ADMIN_EMAIL, ADMIN_PW)
+        r = c.get("/api/admin/users", headers=_bearer(admin_t))
+        assert r.status_code == 200                       # no more 500
+        assert any(x["email"] == "trial_plain@test.com" for x in r.json())
+    user_service.set_trial(env["plain"].id, False, None, None)  # restore
+
+
+def test_naive_trial_record_self_heals_on_load():
+    # A record already persisted with a naive end date loads without error.
+    poisoned = {
+        "id": "poison1", "email": "poison@test.com", "role": "user", "company_id": "co_trial",
+        "trial_enabled": True, "trial_start_date": "2026-06-30T00:00:00",
+        "trial_end_date": "2026-07-14T00:00:00",
+        "created_at": "2026-06-30T00:00:00+00:00", "updated_at": "2026-06-30T00:00:00+00:00",
+    }
+    u = User.model_validate(poisoned)
+    assert u.trial_end_date.tzinfo is not None
+    assert u.days_remaining() is not None                 # would have raised before the fix
+
+
+# -- safe admin reset (BP_ADMIN_RESET) -----------------------------------------
+def test_admin_reset_from_env(env, auth_on):
+    from app.security.passwords import verify_password
+    users = get_user_storage()
+    admin = users.get_by_email(ADMIN_EMAIL)
+    original_hash = admin.password_hash
+    prev_reset, prev_pw = settings.admin_reset, settings.admin_password
+    try:
+        settings.admin_reset = True
+        settings.admin_password = "RecoveredPass123!"
+        auth_service.reset_admin_from_env()
+        refreshed = users.get_by_email(ADMIN_EMAIL)
+        assert refreshed.role == "admin" and refreshed.is_active
+        assert verify_password("RecoveredPass123!", refreshed.password_hash)
+        # The reset only writes to the user store; project storage is separate,
+        # so project data is inherently untouched.
+    finally:
+        # restore the admin password + flag so other tests/logins are unaffected
+        admin = users.get_by_email(ADMIN_EMAIL)
+        admin.password_hash = original_hash
+        users.save(admin)
+        settings.admin_reset, settings.admin_password = prev_reset, prev_pw
+
+
+def test_admin_reset_noop_when_flag_off():
+    users = get_user_storage()
+    admin = users.get_by_email(ADMIN_EMAIL)
+    before = admin.password_hash
+    prev = settings.admin_reset
+    try:
+        settings.admin_reset = False
+        auth_service.reset_admin_from_env()
+        assert users.get_by_email(ADMIN_EMAIL).password_hash == before   # unchanged
+    finally:
+        settings.admin_reset = prev

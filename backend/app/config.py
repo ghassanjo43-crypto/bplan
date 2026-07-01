@@ -58,6 +58,11 @@ class Settings:
     admin_email: str = os.getenv("ADMIN_EMAIL", "admin@example.com")
     admin_password: str = os.getenv("ADMIN_PASSWORD", "ChangeMe123!")
     admin_full_name: str = os.getenv("ADMIN_FULL_NAME", "System Administrator")
+    # One-shot admin recovery: when true, on startup the admin (by ADMIN_EMAIL)
+    # has its password reset to ADMIN_PASSWORD and is re-activated/promoted — or
+    # created if missing. Only touches that one user; never deletes projects or
+    # other users. Set to true, deploy once, then set back to false.
+    admin_reset: bool = os.getenv("BP_ADMIN_RESET", "false").lower() == "true"
     # Dev-only finance user assigned to the demo company (for tenant-isolation testing).
     seed_dev_users: bool = os.getenv("BP_SEED_DEV_USERS", "true").lower() == "true"
 
