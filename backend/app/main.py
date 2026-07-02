@@ -40,6 +40,16 @@ from .services.seed import seed_if_empty
 from .storage import get_storage
 
 logger = logging.getLogger("businessplan")
+# Ensure our INFO diagnostics (e.g. the CORS allow-list logged on startup) are
+# visible under uvicorn on Render, which by default does not enable INFO on the
+# root logger. Attach a dedicated stdout handler once and stop propagating so we
+# never depend on / duplicate uvicorn's root configuration.
+if not logger.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(logging.Formatter("%(levelname)s:     %(name)s: %(message)s"))
+    logger.addHandler(_handler)
+    logger.setLevel(logging.INFO)
+    logger.propagate = False
 
 
 @asynccontextmanager
@@ -140,20 +150,36 @@ for section_router in build_section_routers():
 
 # --------------------------------------------------------------------------
 # Serve the built React SPA (production single-service deployment).
-# In local dev the frontend runs on Vite; this block is a no-op when the
-# build output is absent.
+# In local dev the frontend runs on Vite; the catch-all is a no-op (returns a
+# normal 404) when the build output is absent.
+#
+# The catch-all is registered LAST, so every real backend route (all /api/*
+# routers, /health, /docs, /openapi.json) is matched first by Starlette and can
+# never be shadowed by the SPA. As a defensive second layer, the handler also
+# refuses to serve the SPA for these reserved path prefixes — so even if route
+# ordering ever regressed, /health and /api would return a real 404 (JSON) here
+# rather than silently returning index.html.
 # --------------------------------------------------------------------------
 _FRONTEND_DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
-if (_FRONTEND_DIST / "index.html").exists():
-    if (_FRONTEND_DIST / "assets").is_dir():
-        app.mount("/assets", StaticFiles(directory=_FRONTEND_DIST / "assets"), name="assets")
 
-    @app.get("/{full_path:path}", include_in_schema=False)
-    def spa(full_path: str):
-        # Never let the SPA fallback swallow unmatched API calls.
-        if full_path == "api" or full_path.startswith("api/"):
-            raise HTTPException(status_code=404, detail="Not found")
-        candidate = _FRONTEND_DIST / full_path
-        if full_path and candidate.is_file():
-            return FileResponse(candidate)
-        return FileResponse(_FRONTEND_DIST / "index.html")
+# First path segment that must always belong to the backend, never the SPA.
+_RESERVED_ROOTS = frozenset({"api", "health", "docs", "redoc", "openapi.json"})
+
+if (_FRONTEND_DIST / "assets").is_dir():
+    app.mount("/assets", StaticFiles(directory=_FRONTEND_DIST / "assets"), name="assets")
+
+
+@app.get("/{full_path:path}", include_in_schema=False)
+def spa(full_path: str):
+    # Never let the SPA fallback shadow a real backend route.
+    first_segment = full_path.split("/", 1)[0]
+    if first_segment in _RESERVED_ROOTS:
+        raise HTTPException(status_code=404, detail="Not found")
+    index = _FRONTEND_DIST / "index.html"
+    # API-only deployment (no built frontend present): behave like a plain 404.
+    if not index.exists():
+        raise HTTPException(status_code=404, detail="Not found")
+    candidate = _FRONTEND_DIST / full_path
+    if full_path and candidate.is_file():
+        return FileResponse(candidate)
+    return FileResponse(index)
