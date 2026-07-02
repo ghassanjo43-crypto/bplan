@@ -44,6 +44,9 @@ logger = logging.getLogger("businessplan")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Log the effective CORS allow-list (non-secret) so deploys can confirm at a
+    # glance whether BP_CORS_ORIGINS was picked up. Never logs tokens/secrets.
+    logger.info("CORS origins loaded: %s", settings.cors_origins)
     if settings.seed_on_startup:
         seed_if_empty(get_storage())
     # Backfill the parent Company for any legacy projects (one-time, idempotent).

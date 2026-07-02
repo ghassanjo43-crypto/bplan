@@ -24,10 +24,15 @@ class Settings:
     data_dir: Path = Path(os.getenv("BP_DATA_DIR", Path(__file__).resolve().parent.parent / "data"))
 
     # CORS -----------------------------------------------------------------
+    # Comma-separated allowed origins, read from BP_CORS_ORIGINS. The default
+    # fallback below is used only when that env var is unset/empty; it keeps the
+    # production frontend AND the staging frontend working even if the deploy
+    # forgot to set BP_CORS_ORIGINS, plus the local Vite dev URLs.
     cors_origins: list[str] = [
         o.strip() for o in os.getenv(
             "BP_CORS_ORIGINS",
             "https://bplan2-frontend.onrender.com,"
+            "https://bplan-staging-frontend.onrender.com,"
             "http://localhost:5173,http://127.0.0.1:5173,"
             "http://localhost:5174,http://127.0.0.1:5174",
         ).split(",") if o.strip()
