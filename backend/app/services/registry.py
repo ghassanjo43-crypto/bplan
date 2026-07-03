@@ -48,7 +48,12 @@ class SectionSpec:
 COLLECTION_SECTIONS: dict[str, SectionSpec] = {
     s.key: s
     for s in [
-        SectionSpec("products", "products", "Products & Services", ProductService, True, required=True),
+        # Products & Services is retired from the user-facing flow (Revenue
+        # Assumptions is now the primary revenue workflow). The section, route,
+        # model, and data are kept for backward compatibility, but it is no
+        # longer required and is excluded from SECTION_ORDER so it does not
+        # affect the completion % (a new project can reach 100% without it).
+        SectionSpec("products", "products", "Products & Services", ProductService, True, required=False),
         SectionSpec("revenue", "revenue", "Revenue Assumptions", RevenueAssumption, True),
         # Auto-CRUD for the Add Revenue Stream wizard. Intentionally NOT added to
         # SECTION_ORDER so it does not affect completion % or export ordering.
@@ -82,9 +87,11 @@ SINGLETON_SECTIONS: dict[str, SectionSpec] = {
 ALL_SECTIONS: dict[str, SectionSpec] = {**SINGLETON_SECTIONS, **COLLECTION_SECTIONS}
 
 # Order used for completion %, review page, and JSON export.
+# Note: "products" is intentionally omitted — it is hidden from the menu and no
+# longer required, so it must not count toward completion (same rationale as
+# "revenue-streams" above).
 SECTION_ORDER: tuple[str, ...] = (
     "setup",
-    "products",
     "revenue",
     "direct-costs",
     "staffing",
