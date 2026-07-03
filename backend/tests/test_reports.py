@@ -5,11 +5,15 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.models import ScenarioAssumption
+from app.models.enums import ScenarioType
 from app.schemas.reports import ReportRequest
+from app.services import income_statement_service as isvc
 from app.services import pdf_report_service as pdfsvc
 from app.services import report_data_service as rd
-from app.services import word_report_service as wordsvc
+from app.services import scenario_service as scn
 from app.services.demo_builder import build_demo_project
+from app.services import word_report_service as wordsvc
 
 PID = "demo_aquapure"
 BASE = f"/api/projects/{PID}/reports"
@@ -238,3 +242,52 @@ def test_charts_disabled_no_images(project):
     with zipfile.ZipFile(path) as z:
         media = [n for n in z.namelist() if n.startswith("word/media/")]
     assert media == []
+
+
+# -- report scenario selection uses saved scenario ids ----------------------
+def _custom_project(**kw):
+    p = build_demo_project()
+    scn.ensure_default(p)                                   # guarantee a default
+    custom = ScenarioAssumption(name="Base Case Left", scenario_type=ScenarioType.CUSTOM,
+                                sales_volume_adjustment=20, **kw)
+    p.scenarios.append(custom)
+    return p, custom
+
+
+def test_custom_scenario_available_for_report_selection(client):
+    """A scenario created via the API is available to the report dropdown
+    (which reads the same /scenarios list)."""
+    base = f"/api/projects/{PID}/scenarios"
+    created = client.post(base, json={"name": "Base Case Left", "scenario_type": "custom",
+                                      "sales_volume_adjustment": 20}).json()
+    names = {s["name"]: s["id"] for s in client.get(base).json()}
+    assert "Base Case Left" in names and names["Base Case Left"] == created["id"]
+    client.delete(f"{base}/{created['id']}")
+
+
+def test_report_generates_for_custom_scenario_id():
+    p, custom = _custom_project()
+    opts = ReportRequest(scenario=custom.id, view="yearly", report_style="investor")
+    ctx = rd.build_report_context(p, custom.id, "yearly", opts)
+    assert ctx["scenario"] == custom.id
+    assert ctx["scenario_label"] == "Base Case Left"       # shows the name, not the raw id
+
+
+def test_report_revenue_matches_income_statement_for_scenario():
+    p, custom = _custom_project()
+    opts = ReportRequest(scenario=custom.id, view="yearly", report_style="investor")
+    ctx = rd.build_report_context(p, custom.id, "yearly", opts)
+    is_total = isvc.generate_income_statement(p, custom.id, "yearly").totals.total_revenue
+    rev_hi = next(h for h in ctx["highlights"] if "revenue" in h["label"].lower())
+    assert rev_hi["value"] == rd.fmt_num(is_total)         # same scenario, same numbers
+    # and the +20% volume scenario really differs from base
+    base_total = isvc.generate_income_statement(p, "base", "yearly").totals.total_revenue
+    assert is_total > base_total
+
+
+def test_report_default_base_case_for_old_project_without_scenarios():
+    p = build_demo_project()
+    p.scenarios = []                                        # legacy project, no scenarios
+    opts = ReportRequest(scenario="base", view="yearly", report_style="investor")
+    ctx = rd.build_report_context(p, "base", "yearly", opts)
+    assert ctx["scenario_label"] == "Base Case"            # safe default fallback

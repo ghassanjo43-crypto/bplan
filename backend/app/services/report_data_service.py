@@ -324,7 +324,7 @@ def build_report_context(project: BusinessPlanProject, scenario: str, view: str,
                                        "description": sec.description, "charts": list(sec.charts)})
 
     ctx = dict(
-        currency=currency, scenario=scenario, scenario_label=SCENARIO_LABELS.get(scenario, scenario.title()),
+        currency=currency, scenario=scenario, scenario_label=isvc._scenario_adj(project, scenario).label,
         view=vv, periods=periods, app_name="Business Plan Studio",
         meta=dict(
             # Company (legal/reporting entity) comes from the parent Company
@@ -334,7 +334,7 @@ def build_report_context(project: BusinessPlanProject, scenario: str, view: str,
             title="Business Plan Financial Projection Report",
             subtitle=f"{_words(years)}-Year Projected Financial Study",
             period_range=f"{start_year}–{end_year}", currency=currency,
-            scenario_label=SCENARIO_LABELS.get(scenario, scenario.title()),
+            scenario_label=isvc._scenario_adj(project, scenario).label,
             prepared_date=date.today().strftime("%d %B %Y"),
             prepared_for=PREPARED_FOR.get(options.report_style, "Investors"),
             report_style=_lbl(options.report_style),
@@ -702,7 +702,7 @@ def build_report_preview(project, scenario, view, options):
         project_id=project.id, title="Business Plan Financial Projection Report",
         company=_company_name(project, setup),
         project_name=(setup.project_name if setup else None),
-        scenario=scenario, scenario_label=SCENARIO_LABELS.get(scenario, scenario.title()), view=view,
+        scenario=scenario, scenario_label=isvc._scenario_adj(project, scenario).label, view=view,
         currency=currency, period_range=f"{start_year}–{start_year + years - 1}",
         prepared_date=date.today().strftime("%d %B %Y"), prepared_for=PREPARED_FOR.get(options.report_style, "Investors"),
         sections=[ReportSection(key=k, title=t) for k, t in SECTIONS],
