@@ -52,7 +52,7 @@ export type RepaymentType =
   | 'equal_installments' | 'interest_only_then_principal' | 'bullet' | 'custom'
 export type StockPurchaseCycle = 'weekly' | 'monthly' | 'quarterly' | 'yearly'
 export type TaxFrequency = 'monthly' | 'quarterly' | 'yearly'
-export type ScenarioType = 'base' | 'conservative' | 'optimistic'
+export type ScenarioType = 'base' | 'conservative' | 'optimistic' | 'custom'
 
 // -- Section models ---------------------------------------------------------
 export interface ProjectSetup extends EntityBase {
@@ -337,6 +337,9 @@ export interface TaxAssumption extends EntityBase {
 
 export interface ScenarioAssumption extends EntityBase {
   scenario_type: ScenarioType
+  name: string
+  description?: string | null
+  is_default: boolean
   label?: string | null
   sales_volume_adjustment: number
   selling_price_adjustment: number

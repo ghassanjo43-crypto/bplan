@@ -1,6 +1,7 @@
 /* Types mirroring backend/app/schemas/income_statement.py */
 
-export type ScenarioKey = 'base' | 'conservative' | 'optimistic'
+// A scenario id (named saved scenarios) or a legacy type string.
+export type ScenarioKey = string
 export type ViewKey = 'monthly' | 'yearly'
 export type Severity = 'info' | 'warning' | 'critical'
 

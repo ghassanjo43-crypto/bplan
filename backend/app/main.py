@@ -65,6 +65,12 @@ async def lifespan(app: FastAPI):
         company_service().migrate_all()
     except Exception:
         logger.exception("Company migration on startup failed")
+    # Backfill a default "Base Case" scenario for any project without scenarios.
+    try:
+        from .services import scenario_service
+        scenario_service.backfill_all(get_storage())
+    except Exception:
+        logger.exception("Scenario backfill on startup failed")
     # Seed the initial admin (+ dev users) so the app is reachable after login.
     try:
         from .services import auth_service
@@ -144,6 +150,11 @@ app.include_router(exports_router, prefix=settings.api_prefix)
 # static sub-path resolves ahead of /revenue-streams/{item_id}).
 from .routes.revenue_streams import router as revenue_streams_router  # noqa: E402
 app.include_router(revenue_streams_router, prefix=settings.api_prefix)
+# Scenario default / ensure-default (registered before the generic section
+# router so /scenarios/ensure-default + /scenarios/{id}/default resolve ahead of
+# the generic /scenarios/{item_id}).
+from .routes.scenarios import router as scenarios_router  # noqa: E402
+app.include_router(scenarios_router, prefix=settings.api_prefix)
 for section_router in build_section_routers():
     app.include_router(section_router, prefix=settings.api_prefix)
 

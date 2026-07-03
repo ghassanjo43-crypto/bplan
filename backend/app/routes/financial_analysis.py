@@ -15,7 +15,7 @@ from .deps import get_service, project_or_404
 
 router = APIRouter(prefix="/projects/{project_id}/financial-analysis", tags=["financial-analysis"])
 
-Scenario = Query("base", pattern="^(base|conservative|optimistic)$")
+Scenario = Query("base")   # a scenario id or a legacy type; resolved server-side
 View = Query("yearly", pattern="^(monthly|yearly|annual)$")
 ChartSet = Query(None, pattern="^(overview|profitability|cost_profitability|revenue|cash|balance_sheet|working_capital|scenarios)$")
 

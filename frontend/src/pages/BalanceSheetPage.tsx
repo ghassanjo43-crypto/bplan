@@ -44,7 +44,7 @@ export function BalanceSheetPage() {
       <div className="stack">
         <SectionCard>
           <div className="row row--wrap" style={{ gap: 28, alignItems: 'flex-end' }}>
-            <ScenarioSelector value={scenario} onChange={setScenario} />
+            <ScenarioSelector projectId={projectId} value={scenario} onChange={setScenario} />
             <PeriodViewToggle value={view} onChange={setView} />
             <div className="spacer" />
             <ExportButtons />

@@ -270,6 +270,7 @@ class ScenarioType(str, Enum):
     BASE = "base"
     CONSERVATIVE = "conservative"
     OPTIMISTIC = "optimistic"
+    CUSTOM = "custom"
 
 
 # --------------------------------------------------------------------------

@@ -122,23 +122,46 @@ class ScenarioAdj:
     inflation: float = 0.0
 
 
-def _scenario_adj(project: BusinessPlanProject, scenario: str) -> ScenarioAdj:
-    for s in project.scenarios:
+def _resolve_scenario(project: BusinessPlanProject, scenario: str):
+    """Find the saved scenario for a request identifier.
+
+    Named scenarios are selected by id (the primary path); a legacy type string
+    ("base"/"conservative"/...) still matches by type; and when the identifier
+    doesn't match anything we fall back to the project's default scenario (else
+    None → a synthetic base case). This is the single point that makes the whole
+    statement engine scenario-id aware.
+    """
+    scenarios = project.scenarios
+    for s in scenarios:                       # by id (named scenarios)
+        if s.id == scenario:
+            return s
+    for s in scenarios:                       # by legacy type string
         if s.scenario_type.value == scenario:
-            return ScenarioAdj(
-                scenario_type=scenario,
-                label=s.label or scenario.title(),
-                sales_volume=s.sales_volume_adjustment,
-                selling_price=s.selling_price_adjustment,
-                direct_cost=s.direct_cost_adjustment,
-                salary=s.salary_adjustment,
-                rent=s.rent_adjustment,
-                marketing=s.marketing_adjustment,
-                customer_growth=s.customer_growth_adjustment,
-                interest_rate=s.interest_rate_adjustment,
-                tax_rate=s.tax_rate_adjustment,
-                inflation=s.inflation_adjustment,
-            )
+            return s
+    for s in scenarios:                       # the project default
+        if getattr(s, "is_default", False):
+            return s
+    return None
+
+
+def _scenario_adj(project: BusinessPlanProject, scenario: str) -> ScenarioAdj:
+    s = _resolve_scenario(project, scenario)
+    if s is not None:
+        stype = s.scenario_type.value
+        return ScenarioAdj(
+            scenario_type=stype,
+            label=(s.name or s.label or stype.title()),
+            sales_volume=s.sales_volume_adjustment,
+            selling_price=s.selling_price_adjustment,
+            direct_cost=s.direct_cost_adjustment,
+            salary=s.salary_adjustment,
+            rent=s.rent_adjustment,
+            marketing=s.marketing_adjustment,
+            customer_growth=s.customer_growth_adjustment,
+            interest_rate=s.interest_rate_adjustment,
+            tax_rate=s.tax_rate_adjustment,
+            inflation=s.inflation_adjustment,
+        )
     label = {"base": "Base Case", "conservative": "Conservative Case", "optimistic": "Optimistic Case"}.get(scenario, scenario.title())
     return ScenarioAdj(scenario_type=scenario, label=label)
 

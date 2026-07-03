@@ -14,7 +14,7 @@ from .deps import get_service, project_or_404
 
 router = APIRouter(prefix="/projects/{project_id}/cash-flow", tags=["cash-flow"])
 
-Scenario = Query("base", pattern="^(base|conservative|optimistic)$")
+Scenario = Query("base")   # a scenario id or a legacy type; resolved server-side
 View = Query("yearly", pattern="^(monthly|yearly|annual)$")
 Method = Query("indirect", pattern="^(indirect)$")
 
