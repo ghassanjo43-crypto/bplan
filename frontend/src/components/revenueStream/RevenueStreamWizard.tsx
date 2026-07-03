@@ -28,6 +28,9 @@ const TYPE_LABEL: Record<RevenueStreamType, string> = {
 
 const yearsFromPeriod = (p?: string | null) => (p === '3_years' ? 3 : p === '10_years' ? 10 : 5)
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+const round2 = (n: number) => Math.round(n * 100) / 100
+
 // -- blank stream ----------------------------------------------------------
 function blank(): Partial<RevenueStream> {
   return {
@@ -40,8 +43,104 @@ function blank(): Partial<RevenueStream> {
   }
 }
 
-// -- a constant | varying input with an optional per-period grid -----------
-function DriverInput({ label, method, setMethod, constant, setConstant, values, setValues, periodLabels, unit }: {
+// -- spreadsheet grid for a "varying over time" driver ---------------------
+// Years as rows, months as columns, with a per-year Total and Y/Y% growth.
+// Values are stored at monthly resolution (length = years × 12) so the backend
+// forecast keeps working unchanged. In yearly granularity the same data is
+// entered as annual totals that spread evenly across the twelve months.
+function VaryingGrid({ values, setValues, years, startYear, granularity, unit }: {
+  values: number[]
+  setValues: (v: number[]) => void
+  years: number
+  startYear: number
+  granularity: 'monthly' | 'yearly'
+  unit?: string
+}) {
+  const n = years * 12
+  const cells = useMemo(() => {
+    const arr = (values ?? []).slice(0, n)
+    while (arr.length < n) arr.push(0)
+    return arr
+  }, [values, n])
+
+  const yearTotal = (y: number) => {
+    let s = 0
+    for (let mo = 0; mo < 12; mo++) s += cells[y * 12 + mo] ?? 0
+    return s
+  }
+  const yoy = (y: number) => {
+    if (y === 0) return '—'
+    const prev = yearTotal(y - 1)
+    if (!prev) return '—'
+    return `${(((yearTotal(y) - prev) / prev) * 100).toFixed(1)}%`
+  }
+  const writeMonth = (y: number, mo: number, val: number) => {
+    const next = cells.slice(); next[y * 12 + mo] = val; setValues(next)
+  }
+  const writeYear = (y: number, total: number) => {
+    const per = total / 12
+    const next = cells.slice()
+    for (let mo = 0; mo < 12; mo++) next[y * 12 + mo] = per
+    setValues(next)
+  }
+
+  if (granularity === 'yearly') {
+    return (
+      <div className="table-wrap" style={{ maxHeight: 280, overflow: 'auto' }}>
+        <table className="table">
+          <thead><tr>
+            <th style={{ textAlign: 'left' }}>Year</th>
+            <th style={{ textAlign: 'right' }}>Annual total{unit ? ` (${unit})` : ''}</th>
+            <th style={{ textAlign: 'right' }}>Y/Y%</th>
+          </tr></thead>
+          <tbody>
+            {Array.from({ length: years }, (_, y) => (
+              <tr key={y}>
+                <td><strong>{startYear + y}</strong></td>
+                <td><input className="input input--sm" type="number" style={{ textAlign: 'right' }}
+                  value={round2(yearTotal(y))} onChange={(e) => writeYear(y, Number(e.target.value) || 0)} /></td>
+                <td className="table__num muted">{yoy(y)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <p className="muted" style={{ fontSize: 11.5, marginTop: 4 }}>
+          Annual totals spread evenly across the year. Switch to <strong>Monthly</strong> to enter each month.
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="table-wrap" style={{ maxHeight: 320, overflow: 'auto' }}>
+      <table className="table" style={{ minWidth: 760 }}>
+        <thead><tr>
+          <th style={{ textAlign: 'left' }}>Year</th>
+          {MONTHS.map((m) => <th key={m} style={{ textAlign: 'right' }}>{m}</th>)}
+          <th style={{ textAlign: 'right' }}>Total{unit ? ` (${unit})` : ''}</th>
+          <th style={{ textAlign: 'right' }}>Y/Y%</th>
+        </tr></thead>
+        <tbody>
+          {Array.from({ length: years }, (_, y) => (
+            <tr key={y}>
+              <td><strong>{startYear + y}</strong></td>
+              {MONTHS.map((_, mo) => (
+                <td key={mo}><input className="input input--sm" type="number" style={{ width: 58, textAlign: 'right' }}
+                  value={cells[y * 12 + mo] ?? 0}
+                  onChange={(e) => writeMonth(y, mo, Number(e.target.value) || 0)} /></td>
+              ))}
+              <td className="table__num"><strong>{round2(yearTotal(y))}</strong></td>
+              <td className="table__num muted">{yoy(y)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+// -- a constant | varying driver: single field, or the spreadsheet grid ----
+function DriverInput({ label, method, setMethod, constant, setConstant, values, setValues, years, startYear, granularity, unit }: {
   label: string
   method: ForecastInputMethod
   setMethod: (m: ForecastInputMethod) => void
@@ -49,7 +148,9 @@ function DriverInput({ label, method, setMethod, constant, setConstant, values, 
   setConstant: (n: number) => void
   values: number[]
   setValues: (v: number[]) => void
-  periodLabels: string[]
+  years: number
+  startYear: number
+  granularity: 'monthly' | 'yearly'
   unit?: string
 }) {
   return (
@@ -58,23 +159,13 @@ function DriverInput({ label, method, setMethod, constant, setConstant, values, 
         <span className="field__label">{label}{unit ? ` (${unit})` : ''}</span>
         <div className="segmented">
           <button type="button" className={`segmented__btn${method === 'constant' ? ' segmented__btn--active' : ''}`} onClick={() => setMethod('constant')}>Constant</button>
-          <button type="button" className={`segmented__btn${method === 'varying' ? ' segmented__btn--active' : ''}`} onClick={() => setMethod('varying')}>Varying</button>
+          <button type="button" className={`segmented__btn${method === 'varying' ? ' segmented__btn--active' : ''}`} onClick={() => setMethod('varying')}>Varying over time</button>
         </div>
       </div>
       {method === 'constant' ? (
         <input className="input" type="number" value={constant} onChange={(e) => setConstant(Number(e.target.value) || 0)} />
       ) : (
-        <div className="table-wrap" style={{ maxHeight: 190, overflow: 'auto' }}>
-          <table className="table"><tbody>
-            {periodLabels.map((lbl, i) => (
-              <tr key={i}>
-                <td style={{ width: 110 }}>{lbl}</td>
-                <td><input className="input input--sm" type="number" value={values[i] ?? 0}
-                  onChange={(e) => { const next = [...values]; next[i] = Number(e.target.value) || 0; setValues(next) }} /></td>
-              </tr>
-            ))}
-          </tbody></table>
-        </div>
+        <VaryingGrid values={values} setValues={setValues} years={years} startYear={startYear} granularity={granularity} unit={unit} />
       )}
     </div>
   )
@@ -91,29 +182,23 @@ function Wizard({ years, startYear, currency, onClose, onSubmit, saving, initial
   initial?: RevenueStream | null
 }) {
   const isEdit = !!initial?.id
-  // Existing streams store their varying drivers at monthly resolution, so open
-  // an edited stream in the monthly view to show that data faithfully.
-  const editHasVarying = isEdit && [
-    initial?.quantity_method, initial?.price_method, initial?.signups_method, initial?.revenue_method,
-  ].includes('varying')
-  const [view, setView] = useState<'yearly' | 'monthly'>(editHasVarying ? 'monthly' : 'yearly')
+  // Varying drivers are entered in the month-by-month spreadsheet grid, so
+  // default to the monthly view; the toggle can still summarise annual totals.
+  const [view, setView] = useState<'yearly' | 'monthly'>('monthly')
   const [step, setStep] = useState(0)
   // Merge onto blank() so streams created before a field existed still populate.
   const [f, setF] = useState<Partial<RevenueStream>>(() => (initial ? { ...blank(), ...initial } : blank()))
   const [warn, setWarn] = useState<string | null>(null)
   const set = (p: Partial<RevenueStream>) => setF((cur) => ({ ...cur, ...p }))
 
-  const periodCount = view === 'yearly' ? years : years * 12
-  const periodLabels = useMemo(() => (view === 'yearly'
-    ? Array.from({ length: years }, (_, i) => `Year ${i + 1} (${startYear + i})`)
-    : Array.from({ length: years * 12 }, (_, i) => `Month ${i + 1}`)), [view, years, startYear])
-
-  const grid = (v?: number[]) => {
-    const arr = (v ?? []).slice(0, periodCount)
-    while (arr.length < periodCount) arr.push(0)
+  // Varying values are always stored at monthly resolution (years × 12) so the
+  // backend forecast reads them directly, regardless of the view toggle.
+  const ensureMonthly = (v?: number[]) => {
+    const n = years * 12
+    const arr = (v ?? []).slice(0, n)
+    while (arr.length < n) arr.push(0)
     return arr
   }
-  const toMonthly = (v: number[]) => (view === 'yearly' ? v.flatMap((x) => Array(12).fill(x)) : v)
 
   // Steps per type.
   const t = f.stream_type as RevenueStreamType
@@ -152,7 +237,8 @@ function Wizard({ years, startYear, currency, onClose, onSubmit, saving, initial
       render: () => <DriverInput label={t === 'billable_hours' ? 'Billable hours' : 'Units sold'} unit={qtyUnit}
         method={f.quantity_method!} setMethod={(m) => set({ quantity_method: m })}
         constant={f.quantity_constant ?? 0} setConstant={(n) => set({ quantity_constant: n })}
-        values={grid(f.quantity_monthly)} setValues={(v) => set({ quantity_monthly: v })} periodLabels={periodLabels} />,
+        values={f.quantity_monthly ?? []} setValues={(v) => set({ quantity_monthly: v })}
+        years={years} startYear={startYear} granularity={view} />,
       valid: () => (f.quantity_method === 'constant' && !(f.quantity_constant! > 0) ? `Enter the ${qtyUnit}.` : null),
     })
     steps.push({
@@ -160,7 +246,8 @@ function Wizard({ years, startYear, currency, onClose, onSubmit, saving, initial
       render: () => <DriverInput label={priceLabel} unit={currency}
         method={f.price_method!} setMethod={(m) => set({ price_method: m })}
         constant={f.price_constant ?? 0} setConstant={(n) => set({ price_constant: n })}
-        values={grid(f.price_monthly)} setValues={(v) => set({ price_monthly: v })} periodLabels={periodLabels} />,
+        values={f.price_monthly ?? []} setValues={(v) => set({ price_monthly: v })}
+        years={years} startYear={startYear} granularity={view} />,
       valid: () => (f.price_method === 'constant' && !(f.price_constant! > 0) ? `Enter the ${priceLabel.toLowerCase()}.` : null),
     })
   }
@@ -175,7 +262,8 @@ function Wizard({ years, startYear, currency, onClose, onSubmit, saving, initial
           <DriverInput label="New signups per period" unit="customers"
             method={f.signups_method!} setMethod={(m) => set({ signups_method: m })}
             constant={f.signups_constant ?? 0} setConstant={(n) => set({ signups_constant: n })}
-            values={grid(f.signups_monthly)} setValues={(v) => set({ signups_monthly: v })} periodLabels={periodLabels} />
+            values={f.signups_monthly ?? []} setValues={(v) => set({ signups_monthly: v })}
+            years={years} startYear={startYear} granularity={view} />
         </div>
       ),
       valid: () => null,
@@ -212,7 +300,8 @@ function Wizard({ years, startYear, currency, onClose, onSubmit, saving, initial
       render: () => <DriverInput label="Total revenue" unit={currency}
         method={f.revenue_method!} setMethod={(m) => set({ revenue_method: m })}
         constant={f.revenue_constant ?? 0} setConstant={(n) => set({ revenue_constant: n })}
-        values={grid(f.revenue_monthly)} setValues={(v) => set({ revenue_monthly: v })} periodLabels={periodLabels} />,
+        values={f.revenue_monthly ?? []} setValues={(v) => set({ revenue_monthly: v })}
+        years={years} startYear={startYear} granularity={view} />,
       valid: () => (f.revenue_method === 'constant' && !(f.revenue_constant! > 0) ? 'Enter the revenue amount.' : null),
     })
   }
@@ -232,10 +321,12 @@ function Wizard({ years, startYear, currency, onClose, onSubmit, saving, initial
       if (m) { setStep(i); setWarn(m); return }
     }
     const body: Partial<RevenueStream> = { ...f }
-    if (f.quantity_method === 'varying') body.quantity_monthly = toMonthly(grid(f.quantity_monthly))
-    if (f.price_method === 'varying') body.price_monthly = toMonthly(grid(f.price_monthly))
-    if (f.signups_method === 'varying') body.signups_monthly = toMonthly(grid(f.signups_monthly))
-    if (f.revenue_method === 'varying') body.revenue_monthly = toMonthly(grid(f.revenue_monthly))
+    // Varying drivers are already monthly from the grid; just pad/trim to the
+    // exact projection length (years × 12) before saving.
+    if (f.quantity_method === 'varying') body.quantity_monthly = ensureMonthly(f.quantity_monthly)
+    if (f.price_method === 'varying') body.price_monthly = ensureMonthly(f.price_monthly)
+    if (f.signups_method === 'varying') body.signups_monthly = ensureMonthly(f.signups_monthly)
+    if (f.revenue_method === 'varying') body.revenue_monthly = ensureMonthly(f.revenue_monthly)
     // body carries `id` when editing (merged from `initial`), so the save hook
     // PUTs to update the existing stream instead of POSTing a duplicate.
     onSubmit(body)
