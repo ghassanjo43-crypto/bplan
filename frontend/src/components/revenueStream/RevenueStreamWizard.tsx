@@ -68,11 +68,14 @@ function VaryingGrid({ values, setValues, years, startYear, granularity, unit }:
     for (let mo = 0; mo < 12; mo++) s += cells[y * 12 + mo] ?? 0
     return s
   }
-  const yoy = (y: number) => {
-    if (y === 0) return '—'
+  // Year-over-year growth of the annual total, with a sign + colour direction.
+  const yoy = (y: number): { label: string; cls: string } => {
+    if (y === 0) return { label: '—', cls: '' }
     const prev = yearTotal(y - 1)
-    if (!prev) return '—'
-    return `${(((yearTotal(y) - prev) / prev) * 100).toFixed(1)}%`
+    if (!prev) return { label: '—', cls: '' }
+    const pct = ((yearTotal(y) - prev) / prev) * 100
+    const label = `${pct > 0 ? '+' : ''}${pct.toFixed(1)}%`
+    return { label, cls: pct > 0 ? 'vgrid__yoy--up' : pct < 0 ? 'vgrid__yoy--down' : '' }
   }
   const writeMonth = (y: number, mo: number, val: number) => {
     const next = cells.slice(); next[y * 12 + mo] = val; setValues(next)
@@ -86,53 +89,62 @@ function VaryingGrid({ values, setValues, years, startYear, granularity, unit }:
 
   if (granularity === 'yearly') {
     return (
-      <div className="table-wrap" style={{ maxHeight: 280, overflow: 'auto' }}>
-        <table className="table">
-          <thead><tr>
-            <th style={{ textAlign: 'left' }}>Year</th>
-            <th style={{ textAlign: 'right' }}>Annual total{unit ? ` (${unit})` : ''}</th>
-            <th style={{ textAlign: 'right' }}>Y/Y%</th>
-          </tr></thead>
-          <tbody>
-            {Array.from({ length: years }, (_, y) => (
-              <tr key={y}>
-                <td><strong>{startYear + y}</strong></td>
-                <td><input className="input input--sm" type="number" style={{ textAlign: 'right' }}
-                  value={round2(yearTotal(y))} onChange={(e) => writeYear(y, Number(e.target.value) || 0)} /></td>
-                <td className="table__num muted">{yoy(y)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <p className="muted" style={{ fontSize: 11.5, marginTop: 4 }}>
-          Annual totals spread evenly across the year. Switch to <strong>Monthly</strong> to enter each month.
-        </p>
-      </div>
+      <>
+        <div className="vgrid-wrap">
+          <table className="vgrid">
+            <thead><tr>
+              <th className="vgrid__yhead">Year</th>
+              <th className="vgrid__thead">Annual total{unit ? ` · ${unit}` : ''}</th>
+              <th>Y/Y%</th>
+            </tr></thead>
+            <tbody>
+              {Array.from({ length: years }, (_, y) => {
+                const g = yoy(y)
+                return (
+                  <tr key={y}>
+                    <td className="vgrid__year">{startYear + y}</td>
+                    <td>
+                      <input className="vgrid__cell" type="number" value={round2(yearTotal(y))}
+                        onChange={(e) => writeYear(y, Number(e.target.value) || 0)} />
+                    </td>
+                    <td className={`vgrid__yoy ${g.cls}`}>{g.label}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+        <p className="vgrid__hint">Annual totals spread evenly across the year. Switch to <strong>Monthly</strong> to enter each month.</p>
+      </>
     )
   }
 
   return (
-    <div className="table-wrap" style={{ maxHeight: 320, overflow: 'auto' }}>
-      <table className="table" style={{ minWidth: 760 }}>
+    <div className="vgrid-wrap">
+      <table className="vgrid">
         <thead><tr>
-          <th style={{ textAlign: 'left' }}>Year</th>
-          {MONTHS.map((m) => <th key={m} style={{ textAlign: 'right' }}>{m}</th>)}
-          <th style={{ textAlign: 'right' }}>Total{unit ? ` (${unit})` : ''}</th>
-          <th style={{ textAlign: 'right' }}>Y/Y%</th>
+          <th className="vgrid__yhead">Year</th>
+          {MONTHS.map((m) => <th key={m}>{m}</th>)}
+          <th className="vgrid__thead">Total{unit ? ` · ${unit}` : ''}</th>
+          <th>Y/Y%</th>
         </tr></thead>
         <tbody>
-          {Array.from({ length: years }, (_, y) => (
-            <tr key={y}>
-              <td><strong>{startYear + y}</strong></td>
-              {MONTHS.map((_, mo) => (
-                <td key={mo}><input className="input input--sm" type="number" style={{ width: 58, textAlign: 'right' }}
-                  value={cells[y * 12 + mo] ?? 0}
-                  onChange={(e) => writeMonth(y, mo, Number(e.target.value) || 0)} /></td>
-              ))}
-              <td className="table__num"><strong>{round2(yearTotal(y))}</strong></td>
-              <td className="table__num muted">{yoy(y)}</td>
-            </tr>
-          ))}
+          {Array.from({ length: years }, (_, y) => {
+            const g = yoy(y)
+            return (
+              <tr key={y}>
+                <td className="vgrid__year">{startYear + y}</td>
+                {MONTHS.map((_, mo) => (
+                  <td key={mo}>
+                    <input className="vgrid__cell" type="number" value={cells[y * 12 + mo] ?? 0}
+                      onChange={(e) => writeMonth(y, mo, Number(e.target.value) || 0)} />
+                  </td>
+                ))}
+                <td className="vgrid__total">{round2(yearTotal(y))}</td>
+                <td className={`vgrid__yoy ${g.cls}`}>{g.label}</td>
+              </tr>
+            )
+          })}
         </tbody>
       </table>
     </div>
