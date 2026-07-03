@@ -75,6 +75,44 @@ def compute_monthly(stream, n: int) -> list[float]:
     return [0.0] * n
 
 
+def active_customers(stream, n: int) -> list[float]:
+    """Month-by-month active customer count for a recurring-charges stream."""
+    signups = _series(stream.signups_method, stream.signups_constant, stream.signups_monthly, n)
+    churn = (stream.churn_rate_percent or 0) / 100.0
+    out = [0.0] * n
+    beginning = float(stream.initial_customers or 0)
+    for i in range(n):
+        ending = beginning + signups[i] - beginning * churn
+        if ending < 0:
+            ending = 0.0
+        out[i] = round(ending, 4)
+        beginning = ending
+    return out
+
+
+def driver_series(stream, n: int) -> tuple[list[float], list[float], list[float]]:
+    """Return (quantity, unit_price, customers) monthly series for a stream.
+
+    Used by direct-cost association so a cost linked to a revenue stream can be
+    priced from the stream's forecast quantity (per-unit) or its customers
+    (per-customer). ``revenue_only`` streams have no unit concept, so per-unit
+    drivers are zero (percent-of-revenue still works off ``compute_monthly``).
+    """
+    if not getattr(stream, "active", True) or n <= 0:
+        z = [0.0] * max(n, 0)
+        return list(z), list(z), list(z)
+    t = _val(stream.stream_type)
+    if t in ("unit_sales", "billable_hours"):
+        q = _series(stream.quantity_method, stream.quantity_constant, stream.quantity_monthly, n)
+        p = _series(stream.price_method, stream.price_constant, stream.price_monthly, n)
+        return q, p, list(q)
+    if t == "recurring_charges":
+        customers = active_customers(stream, n)
+        charge = [float(stream.recurring_charge or 0)] * n
+        return list(customers), charge, customers
+    return [0.0] * n, [0.0] * n, [0.0] * n
+
+
 def annual_totals(monthly: list[float], years: int) -> list[float]:
     return [round(sum(monthly[y * 12:(y + 1) * 12]), 2) for y in range(years)]
 

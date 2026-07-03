@@ -14,7 +14,7 @@ import {
   useSaveCollectionItem,
 } from '@/api/hooks'
 import { useProjectContext } from '@/layouts/ProjectContext'
-import type { DirectCostItem, ProductService } from '@/types'
+import type { DirectCostItem, ProductService, RevenueStream } from '@/types'
 import { formatCurrency, formatDate, formatPercent } from '@/utils/format'
 import {
   costCalculationMethodOptions,
@@ -23,6 +23,7 @@ import {
 } from '@/utils/options'
 import {
   associationLabel,
+  type Associable,
   COST_TEMPLATES,
   isUnassigned,
   marginByProduct,
@@ -36,6 +37,7 @@ type Tab = { key: string; label: string }
 export function DirectCostsPage({ embedded }: { embedded?: boolean } = {}) {
   const { projectId, currency } = useProjectContext()
   const productsQ = useCollectionSection<ProductService>(projectId, 'products')
+  const streamsQ = useCollectionSection<RevenueStream>(projectId, 'revenue-streams')
   const itemsQ = useCollectionSection<DirectCostItem>(projectId, 'direct-costs')
   const saveItem = useSaveCollectionItem<DirectCostItem>(projectId, 'direct-costs')
   const deleteItem = useDeleteCollectionItem(projectId, 'direct-costs')
@@ -48,15 +50,24 @@ export function DirectCostsPage({ embedded }: { embedded?: boolean } = {}) {
 
   const products = productsQ.data ?? []
   const items = itemsQ.data ?? []
+  // Revenue streams are the primary association source; fall back to legacy
+  // products only for old projects that have no revenue streams. Hidden products
+  // are never surfaced in the association UI once streams exist.
+  const activeStreams = (streamsQ.data ?? []).filter((s) => s.active)
+  const hasStreams = activeStreams.length > 0
+  const associations: Associable[] = hasStreams
+    ? activeStreams.map((s) => ({ id: s.id, name: s.name }))
+    : products.map((p) => ({ id: p.id, name: p.name }))
 
   const tabs: Tab[] = useMemo(
     () => [
       { key: 'all', label: 'All' },
       { key: 'shared', label: 'Shared' },
       { key: 'unassigned', label: 'Unassigned' },
-      ...products.map((p) => ({ key: `p:${p.id}`, label: p.name })),
+      ...associations.map((a) => ({ key: `p:${a.id}`, label: a.name })),
     ],
-    [products],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [JSON.stringify(associations)],
   )
 
   const filtered = useMemo(() => {
@@ -67,9 +78,15 @@ export function DirectCostsPage({ embedded }: { embedded?: boolean } = {}) {
     return items.filter((i) => i.apply_to_all || i.product_ids.includes(pid))
   }, [tab, items])
 
-  const margins = useMemo(() => marginByProduct(products, items), [products, items])
+  // Gross-margin preview is inherently product-based (selling price vs unit
+  // cost); it is only shown for legacy product-only projects so hidden products
+  // are never exposed once revenue streams are the primary workflow.
+  const margins = useMemo(
+    () => (hasStreams ? [] : marginByProduct(products, items)),
+    [hasStreams, products, items],
+  )
 
-  if (productsQ.isLoading || itemsQ.isLoading) return <LoadingScreen />
+  if (productsQ.isLoading || streamsQ.isLoading || itemsQ.isLoading) return <LoadingScreen />
 
   // -- summary metrics ------------------------------------------------------
   const activeItems = items.filter((i) => i.active)
@@ -124,9 +141,9 @@ export function DirectCostsPage({ embedded }: { embedded?: boolean } = {}) {
         isUnassigned(r) ? (
           <Badge tone="amber" dot>Unassigned</Badge>
         ) : r.apply_to_all ? (
-          <Badge tone="blue">All products</Badge>
+          <Badge tone="blue">All revenue streams</Badge>
         ) : (
-          associationLabel(r, products)
+          associationLabel(r, associations)
         ),
     },
     { header: 'Method', cell: (r) => <Badge tone="neutral">{labelFor(costCalculationMethodOptions, r.calculation_method)}</Badge> },
@@ -182,7 +199,7 @@ export function DirectCostsPage({ embedded }: { embedded?: boolean } = {}) {
         <div className="stat-grid">
           <SummaryCard label="Direct Cost Items" value={items.length} accent="blue" hint={`${activeItems.length} active`} />
           <SummaryCard label="Amount-based Total" value={formatCurrency(amountTotal, currency)} accent="amber" help="Sum of fixed/per-unit amounts (excludes % methods)." />
-          <SummaryCard label="Avg. Gross Margin" value={products.length ? formatPercent(avgMargin) : '—'} accent={avgMargin < 0 ? 'amber' : 'green'} help="Average estimated gross margin across products." />
+          <SummaryCard label="Avg. Gross Margin" value={!hasStreams && products.length ? formatPercent(avgMargin) : '—'} accent={avgMargin < 0 ? 'amber' : 'green'} help="Average estimated gross margin across products (legacy product projects)." />
           <SummaryCard label="Unassigned" value={unassignedCount} accent={unassignedCount ? 'amber' : 'slate'} />
         </div>
 
@@ -256,9 +273,9 @@ export function DirectCostsPage({ embedded }: { embedded?: boolean } = {}) {
           )}
         </SectionCard>
 
-        {/* Gross margin preview */}
-        {products.length > 0 && (
-          <SectionCard title="Gross Margin Preview by Revenue Stream" subtitle="Estimated from per-unit and percentage direct costs." icon="◴">
+        {/* Gross margin preview — legacy product projects only */}
+        {!hasStreams && products.length > 0 && (
+          <SectionCard title="Gross Margin Preview" subtitle="Estimated from per-unit and percentage direct costs." icon="◴">
             <div className="table-wrap">
               <table className="table">
                 <thead>
@@ -294,7 +311,7 @@ export function DirectCostsPage({ embedded }: { embedded?: boolean } = {}) {
         open={modal.open}
         item={modal.item}
         prefill={modal.prefill}
-        products={products}
+        associations={associations}
         currency={currency}
         onClose={() => setModal({ open: false, item: null })}
         onSubmit={handleSubmit}

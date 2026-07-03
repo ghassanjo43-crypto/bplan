@@ -271,6 +271,9 @@ def calculate_revenue(ctx: Ctx) -> dict[str, ProductModel]:
     project, scen, n, start = ctx.project, ctx.scen, ctx.n, ctx.start
     vol_factor = 1 + scen.sales_volume / 100.0
     price_factor = 1 + scen.selling_price / 100.0
+    # Per-product resolution — the source of truth for receivables / VAT / cash
+    # flow and for the legacy P&L path (income statement revenue is gated to use
+    # revenue streams when present, in _compute).
     resolved = rps.resolve_streams(project, n, start, vol_factor, price_factor)
     ctx._resolved_rev = resolved  # type: ignore[attr-defined]
 
@@ -304,11 +307,13 @@ def calculate_direct_costs(ctx: Ctx, products: dict[str, ProductModel]) -> dict[
     from . import direct_cost_projection_service as dcp
 
     project, scen, n, start = ctx.project, ctx.scen, ctx.n, ctx.start
-    resolved_rev = getattr(ctx, "_resolved_rev", None)
-    if resolved_rev is None:
-        from . import revenue_projection_service as rps
-        resolved_rev = rps.resolve_streams(project, n, start,
-                                            1 + scen.sales_volume / 100.0, 1 + scen.selling_price / 100.0)
+    # Direct costs associate with the unified revenue sources — revenue streams
+    # when the project has them, else legacy products. This is intentionally
+    # separate from ctx._resolved_rev (per-product, used by receivables/VAT).
+    from . import revenue_projection_service as rps
+    resolved_rev = rps.resolve_revenue_sources(
+        project, n, start,
+        1 + scen.sales_volume / 100.0, 1 + scen.selling_price / 100.0)
 
     resolved = dcp.resolve_items(project, n, start, resolved_rev,
                                  1 + scen.direct_cost / 100.0, scen.inflation)

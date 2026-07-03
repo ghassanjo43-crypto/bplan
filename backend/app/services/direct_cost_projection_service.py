@@ -70,10 +70,9 @@ class ResolvedCost:
     computed: list[float] = field(default_factory=list)
 
 
-def _purchased_base(project, resolved_rev, n, start, extra_infl) -> dict[str, list[float]]:
-    """Per-product per-month purchased per-unit cost (fixed_per_unit items)."""
-    base: dict[str, list[float]] = {p.id: [0.0] * n for p in project.products}
-    all_ids = [p.id for p in project.products]
+def _purchased_base(project, all_ids, n, start, extra_infl) -> dict[str, list[float]]:
+    """Per-source per-month purchased per-unit cost (fixed_per_unit items)."""
+    base: dict[str, list[float]] = {sid: [0.0] * n for sid in all_ids}
     for item in project.direct_costs:
         if not item.active or item.calculation_method != CM.FIXED_PER_UNIT:
             continue
@@ -102,8 +101,10 @@ def resolve_items(
     project: BusinessPlanProject, n: int, start: date, resolved_rev: dict,
     direct_cost_factor: float = 1.0, extra_infl: float = 0.0,
 ) -> dict[str, ResolvedCost]:
-    all_ids = [p.id for p in project.products]
-    purchased = _purchased_base(project, resolved_rev, n, start, extra_infl)
+    # Association universe = whatever revenue sources were resolved (revenue
+    # streams when the project has them, else legacy products).
+    all_ids = list(resolved_rev.keys())
+    purchased = _purchased_base(project, all_ids, n, start, extra_infl)
     out: dict[str, ResolvedCost] = {}
 
     for item in project.direct_costs:
@@ -169,7 +170,7 @@ def ensure_persisted(project: BusinessPlanProject, n: int) -> bool:
 def generate_direct_cost_grid(project: BusinessPlanProject, mode: str) -> ProjectionGrid:
     start, years, n = periods.build_projection_periods(project)
     plist = periods.periods_for(project, mode)
-    resolved_rev = rev.resolve_streams(project, n, start)
+    resolved_rev = rev.resolve_revenue_sources(project, n, start)
     resolved = resolve_items(project, n, start, resolved_rev)
     currency = project.setup.currency if project.setup else "USD"
     rows: list[GridRow] = []
@@ -218,7 +219,7 @@ def generate_direct_cost_grid(project: BusinessPlanProject, mode: str) -> Projec
 
     for pid, rs in resolved_rev.items():
         if pid not in covered and sum(rs.net) > 0:
-            warnings.append(f"Revenue stream '{rs.product.name}' has no direct cost assigned.")
+            warnings.append(f"Revenue stream '{rs.name}' has no direct cost assigned.")
 
     return ProjectionGrid(
         project_id=project.id, section="direct_costs", mode=mode, currency=currency,

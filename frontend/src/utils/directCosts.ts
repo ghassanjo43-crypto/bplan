@@ -12,6 +12,13 @@ import { PERCENT_METHODS, PER_UNIT_METHODS } from './options'
 
 export type AssociationMode = 'one' | 'multiple' | 'all' | 'unassigned'
 
+/** Anything a direct cost can associate with — a revenue stream (primary) or,
+ *  for legacy projects, a product/service. Only id + display name are needed. */
+export interface Associable {
+  id: string
+  name: string
+}
+
 export function usesPercent(method: CostCalculationMethod): boolean {
   return PERCENT_METHODS.includes(method)
 }
@@ -39,14 +46,14 @@ export function deriveMode(item: DirectCostItem): AssociationMode {
 }
 
 /** Human-readable label of what a cost item is associated with. */
-export function associationLabel(item: DirectCostItem, products: ProductService[]): string {
-  if (item.apply_to_all) return 'All products'
+export function associationLabel(item: DirectCostItem, sources: Associable[]): string {
+  if (item.apply_to_all) return 'All revenue streams'
   if (item.product_ids.length === 0) return 'Unassigned'
   const names = item.product_ids
-    .map((id) => products.find((p) => p.id === id)?.name)
+    .map((id) => sources.find((s) => s.id === id)?.name)
     .filter(Boolean) as string[]
   if (names.length === 1) return names[0]
-  return `${names.length} products`
+  return `${names.length} revenue streams`
 }
 
 /** The "amount / percentage" cell value. */
