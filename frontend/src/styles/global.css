@@ -689,7 +689,7 @@ h4 {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   text-align: right;
-  padding: 9px 11px;
+  padding: 6px 12px;
   border-bottom: 1px solid var(--border);
   white-space: nowrap;
 }
@@ -704,7 +704,7 @@ h4 {
 }
 .vgrid tbody td {
   padding: 0;
-  height: 40px;
+  height: 32px;
   border-bottom: 1px solid var(--slate-100);
 }
 .vgrid tbody tr:last-child td {
@@ -719,7 +719,7 @@ h4 {
   border-right: 1px solid var(--border);
   padding: 0 14px;
   font-weight: 600;
-  font-size: 13px;
+  font-size: 12.5px;
   color: var(--text-primary);
   white-space: nowrap;
   letter-spacing: 0.01em;
@@ -744,7 +744,7 @@ h4 {
   border: 0;
   outline: none;
   background: transparent;
-  padding: 9px 11px;
+  padding: 5px 12px;
   text-align: right;
   font-size: 12.5px;
   font-variant-numeric: tabular-nums;
@@ -766,7 +766,7 @@ h4 {
 }
 /* Total + Y/Y% summary columns. */
 .vgrid__total {
-  padding: 9px 14px;
+  padding: 5px 14px;
   text-align: right;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
@@ -775,7 +775,7 @@ h4 {
   white-space: nowrap;
 }
 .vgrid__yoy {
-  padding: 9px 14px;
+  padding: 5px 14px;
   text-align: right;
   font-size: 11.5px;
   font-variant-numeric: tabular-nums;
@@ -957,6 +957,10 @@ h4 {
 }
 .modal--wide {
   width: min(860px, calc(100vw - 48px));
+}
+/* Revenue Stream wizard: wider so the month-by-month grid can breathe. */
+.modal--wizard {
+  width: min(1160px, calc(100vw - 40px));
 }
 .modal__header {
   padding: 20px 24px;

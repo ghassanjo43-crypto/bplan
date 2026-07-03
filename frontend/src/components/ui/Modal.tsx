@@ -7,6 +7,7 @@ export function Modal({
   children,
   footer,
   wide = false,
+  className,
 }: {
   title: string
   open: boolean
@@ -14,6 +15,7 @@ export function Modal({
   children: ReactNode
   footer?: ReactNode
   wide?: boolean
+  className?: string
 }) {
   useEffect(() => {
     if (!open) return
@@ -33,7 +35,7 @@ export function Modal({
   return (
     <div className="overlay" onMouseDown={onClose}>
       <div
-        className={`modal${wide ? ' modal--wide' : ''}`}
+        className={`modal${wide ? ' modal--wide' : ''}${className ? ` ${className}` : ''}`}
         onMouseDown={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"

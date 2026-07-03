@@ -345,7 +345,7 @@ function Wizard({ years, startYear, currency, onClose, onSubmit, saving, initial
   }
 
   return (
-    <Modal open wide title={isEdit ? 'Edit Revenue Stream' : 'Add Revenue Stream'} onClose={onClose} footer={
+    <Modal open wide className="modal--wizard" title={isEdit ? 'Edit Revenue Stream' : 'Add Revenue Stream'} onClose={onClose} footer={
       <div className="row row--between" style={{ width: '100%' }}>
         <button className="btn btn--ghost" onClick={onClose}>Discard &amp; Exit</button>
         <div className="row" style={{ gap: 8 }}>
