@@ -87,6 +87,19 @@ function VaryingGrid({ values, setValues, years, startYear, granularity, unit }:
     setValues(next)
   }
 
+  // Flat monthly index of the cell the user last focused/edited — drives the
+  // contextual "Apply values right" helper (kept after blur so the click lands).
+  const [selected, setSelected] = useState<number | null>(null)
+  const applyRight = () => {
+    if (selected === null) return
+    const val = cells[selected] ?? 0
+    const next = cells.slice()
+    for (let i = selected + 1; i < n; i++) next[i] = val   // never touches cells to the left
+    setValues(next)
+  }
+  const sourceLabel = selected === null
+    ? '' : `${MONTHS[selected % 12]} ${startYear + Math.floor(selected / 12)}`
+
   if (granularity === 'yearly') {
     return (
       <>
@@ -120,34 +133,52 @@ function VaryingGrid({ values, setValues, years, startYear, granularity, unit }:
   }
 
   return (
-    <div className="vgrid-wrap">
-      <table className="vgrid">
-        <thead><tr>
-          <th className="vgrid__yhead">Year</th>
-          {MONTHS.map((m) => <th key={m}>{m}</th>)}
-          <th className="vgrid__thead">Total{unit ? ` · ${unit}` : ''}</th>
-          <th>Y/Y%</th>
-        </tr></thead>
-        <tbody>
-          {Array.from({ length: years }, (_, y) => {
-            const g = yoy(y)
-            return (
-              <tr key={y}>
-                <td className="vgrid__year">{startYear + y}</td>
-                {MONTHS.map((_, mo) => (
-                  <td key={mo}>
-                    <input className="vgrid__cell" type="number" value={cells[y * 12 + mo] ?? 0}
-                      onChange={(e) => writeMonth(y, mo, Number(e.target.value) || 0)} />
-                  </td>
-                ))}
-                <td className="vgrid__total">{round2(yearTotal(y))}</td>
-                <td className={`vgrid__yoy ${g.cls}`}>{g.label}</td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
-    </div>
+    <>
+      <div className="vgrid-wrap">
+        <table className="vgrid">
+          <thead><tr>
+            <th className="vgrid__yhead">Year</th>
+            {MONTHS.map((m) => <th key={m}>{m}</th>)}
+            <th className="vgrid__thead">Total{unit ? ` · ${unit}` : ''}</th>
+            <th>Y/Y%</th>
+          </tr></thead>
+          <tbody>
+            {Array.from({ length: years }, (_, y) => {
+              const g = yoy(y)
+              return (
+                <tr key={y}>
+                  <td className="vgrid__year">{startYear + y}</td>
+                  {MONTHS.map((_, mo) => {
+                    const idx = y * 12 + mo
+                    return (
+                      <td key={mo}>
+                        <input className={`vgrid__cell${selected === idx ? ' vgrid__cell--source' : ''}`}
+                          type="number" value={cells[idx] ?? 0}
+                          onFocus={() => setSelected(idx)}
+                          onChange={(e) => writeMonth(y, mo, Number(e.target.value) || 0)} />
+                      </td>
+                    )
+                  })}
+                  <td className="vgrid__total">{round2(yearTotal(y))}</td>
+                  <td className={`vgrid__yoy ${g.cls}`}>{g.label}</td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+      {selected !== null && (
+        <div className="vgrid__toolbar">
+          <button type="button" className="btn btn--secondary btn--sm vgrid__apply"
+            onMouseDown={(e) => e.preventDefault()}   /* keep cell focus; avoid blur race */
+            onClick={applyRight}
+            title={`Copy ${sourceLabel} into every following month through ${startYear + years - 1}`}>
+            <span aria-hidden>→</span> Apply values right
+          </button>
+          <span className="vgrid__toolbar-hint">Fills {sourceLabel} across all later months.</span>
+        </div>
+      )}
+    </>
   )
 }
 
