@@ -77,21 +77,52 @@ def test_forecast_totals_monthly_and_annual():
     assert annual["grand_total"] == 24000 * len(annual["periods"])
 
 
-# -- income statement integration (additive) -------------------------------
-def test_income_statement_includes_streams():
+# -- income statement integration: streams take precedence over products ----
+def _months(p):
+    from app.services.income_statement_service import build_projection_periods
+    return build_projection_periods(p)[2]
+
+
+def test_income_statement_uses_streams_and_does_not_double_count():
+    """When a project has revenue streams, revenue comes from the streams only —
+    the legacy per-product revenue is not added on top (no double counting)."""
     p = build_demo_project()
-    base = isvc.generate_income_statement(p, "base", "yearly").totals.total_revenue
+    legacy = isvc.generate_income_statement(p, "base", "yearly").totals.total_revenue
+    assert legacy > 0                                     # legacy product revenue
+
     p.revenue_streams.append(_stream(name="Extra", stream_type="revenue_only", revenue_constant=1000))
     after = isvc.generate_income_statement(p, "base", "yearly").totals.total_revenue
-    assert round(after - base) == 60000                  # 1000/mo * 60 months
+    n = _months(p)
+    assert round(after) == 1000 * n                       # streams REPLACE products
+    assert round(after) != round(legacy + 1000 * n)       # explicitly not additive
 
 
-def test_legacy_project_unaffected():
+def test_streams_with_zero_products_show_revenue():
+    """A project with revenue streams and NO products still reports revenue in
+    the financial statements (the new primary workflow standing on its own)."""
     p = build_demo_project()
-    assert p.revenue_streams == []                        # default empty
-    # a project with no streams produces the same revenue as before this feature
+    p.products, p.revenue, p.direct_costs = [], [], []    # a pure revenue-streams project
+    p.revenue_streams = [_stream(name="Direct", stream_type="revenue_only", revenue_constant=5000)]
     r = isvc.generate_income_statement(p, "base", "yearly")
+    n = _months(p)
     assert r.totals.total_revenue > 0
+    assert round(r.totals.total_revenue) == 5000 * n
+    assert round(r.totals.total_revenue) == round(sum(rss.compute_monthly(p.revenue_streams[0], n)))
+
+
+def test_legacy_products_only_still_load_export_and_report():
+    """Old projects with only products/revenue (no streams) keep working: the
+    income statement uses the legacy path and the project round-trips through
+    (de)serialisation like the JSON export."""
+    from app.models import BusinessPlanProject
+    p = build_demo_project()
+    assert p.revenue_streams == [] and len(p.products) > 0   # legacy shape
+    r = isvc.generate_income_statement(p, "base", "yearly")
+    assert r.totals.total_revenue > 0                        # legacy revenue intact
+    # export/serialise + reload without loss (mirrors the /export-json round-trip)
+    reloaded = BusinessPlanProject(**p.model_dump())
+    assert len(reloaded.products) == len(p.products)
+    assert isvc.generate_income_statement(reloaded, "base", "yearly").totals.total_revenue > 0
 
 
 # -- edit flow: PUT updates in place (regression for "cannot edit streams") --

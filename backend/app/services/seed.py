@@ -15,6 +15,7 @@ from ..models import (
     ProductService,
     ProjectSetup,
     RevenueAssumption,
+    RevenueStream,
     ScenarioAssumption,
     StaffRole,
     StartupCost,
@@ -22,6 +23,7 @@ from ..models import (
     WorkingCapitalAssumption,
 )
 from ..models.enums import (
+    BillingFrequency,
     BusinessModel,
     CostAllocationMethod,
     CostBehavior,
@@ -38,6 +40,7 @@ from ..models.enums import (
     ProjectionPeriod,
     ReportingStandard,
     RepaymentType,
+    RevenueStreamType,
     RevenueType,
     ScenarioType,
     StartupCostCategory,
@@ -83,6 +86,29 @@ def build_seed_project() -> BusinessPlanProject:
             contract_value=2500,
             number_of_contracts=8,
             payment_terms=PaymentTerms.NET_30,
+        ),
+    ]
+
+    # Revenue Streams are now the primary revenue workflow (the wizard). These
+    # mirror the two offerings above so the demo's revenue is driven by streams;
+    # the products/RevenueAssumptions are kept for backward compatibility and so
+    # the direct costs below (per-customer, per-contract, % of revenue) still
+    # resolve. The income statement uses streams when present (no double count).
+    revenue_streams = [
+        RevenueStream(
+            name="Pro Subscription",
+            stream_type=RevenueStreamType.RECURRING_CHARGES,
+            initial_customers=120,
+            signups_constant=10,
+            recurring_charge=49,
+            billing_frequency=BillingFrequency.MONTHLY,
+            churn_rate_percent=4,
+        ),
+        RevenueStream(
+            name="Onboarding Service",
+            stream_type=RevenueStreamType.UNIT_SALES,
+            quantity_constant=8,
+            price_constant=2500,
         ),
     ]
 
@@ -223,6 +249,7 @@ def build_seed_project() -> BusinessPlanProject:
         ),
         products=[saas, onboarding],
         revenue=revenue,
+        revenue_streams=revenue_streams,
         direct_costs=direct_costs,
         staffing=staffing,
         operating_expenses=operating_expenses,

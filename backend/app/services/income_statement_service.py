@@ -652,23 +652,31 @@ def _compute(project: BusinessPlanProject, scenario: str) -> tuple[Ctx, dict]:
     # Revenue lines by IFRS type
     rev_lines: dict[str, list[float]] = {key: _zeros(n) for key, _, _ in REVENUE_LINES}
     rev_children: dict[str, list[IncomeStatementLineItem]] = {key: [] for key, _, _ in REVENUE_LINES}
-    for pid, pm in products.items():
-        key = REVENUE_TYPE_TO_LINE.get(pm.product.revenue_type.value, "other_revenue")
-        rev_lines[key] = _add(rev_lines[key], pm.revenue)
-        rev_children[key].append(IncomeStatementLineItem(
-            key=f"rev_{pid}", label=pm.product.name, classification="revenue",
-            values_by_period=pm.revenue, total=sum(pm.revenue),
-            note=pm.product.revenue_type.value.replace("_", " "),
-        ))
-
-    # Add Revenue Stream wizard output (additive; empty list -> no change, so
-    # existing projects are unaffected). Each stream maps to an IFRS line and is
-    # scaled by the scenario sales-volume adjustment like product revenue.
+    # Revenue Streams (the wizard) are the primary revenue source. When a project
+    # has any active revenue stream, revenue is taken *entirely* from the streams
+    # and the legacy per-product revenue is NOT added — this prevents
+    # double-counting for migrated projects. Projects with no revenue streams
+    # fall back to the legacy product/revenue model exactly as before. (The
+    # per-product `products` model is still resolved above because direct costs
+    # depend on it — e.g. per-customer, per-contract, and percent-of-revenue.)
     from . import revenue_stream_service as rss
+    active_streams = [s for s in getattr(project, "revenue_streams", [])
+                      if getattr(s, "active", True)]
+
+    if not active_streams:
+        for pid, pm in products.items():
+            key = REVENUE_TYPE_TO_LINE.get(pm.product.revenue_type.value, "other_revenue")
+            rev_lines[key] = _add(rev_lines[key], pm.revenue)
+            rev_children[key].append(IncomeStatementLineItem(
+                key=f"rev_{pid}", label=pm.product.name, classification="revenue",
+                values_by_period=pm.revenue, total=sum(pm.revenue),
+                note=pm.product.revenue_type.value.replace("_", " "),
+            ))
+
+    # Each stream maps to an IFRS line and is scaled by the scenario sales-volume
+    # adjustment like product revenue.
     vol_factor = 1 + ctx.scen.sales_volume / 100.0
-    for stream in getattr(project, "revenue_streams", []):
-        if not getattr(stream, "active", True):
-            continue
+    for stream in active_streams:
         monthly = [round(v * vol_factor, 4) for v in rss.compute_monthly(stream, n)]
         key = rss.IFRS_LINE.get(stream.stream_type.value, "other_revenue")
         rev_lines[key] = _add(rev_lines[key], monthly)
