@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { NAV_GROUPS, NAV_PAGES } from '@/routes/nav'
+import { NAV_GROUPS, VISIBLE_NAV_PAGES } from '@/routes/nav'
 import { UserMenu } from '@/components/auth/UserMenu'
 
 /**
@@ -566,7 +566,7 @@ export function GuidePage() {
         </p>
         <div className="guide-groups">
           {NAV_GROUPS.map((group) => {
-            const pages = NAV_PAGES.filter((p) => p.group === group)
+            const pages = VISIBLE_NAV_PAGES.filter((p) => p.group === group)
             return (
               <div className="card guide-group" key={group}>
                 <div className="card__header">
@@ -581,7 +581,7 @@ export function GuidePage() {
                 <div className="card__body" style={{ paddingTop: 8, paddingBottom: 8 }}>
                   <ul className="guide-steplist">
                     {pages.map((p) => {
-                      const n = NAV_PAGES.indexOf(p) + 1
+                      const n = VISIBLE_NAV_PAGES.indexOf(p) + 1
                       return (
                         <li className="guide-step" key={p.slug}>
                           <span className="guide-step__num">{n}</span>
