@@ -9,11 +9,24 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.models import ScenarioAssumption
 from app.models.enums import ScenarioType
+from app.services import financial_analysis_service as fas
 from app.services import income_statement_service as isvc
 from app.services import scenario_service as scn
 from app.services.demo_builder import build_demo_project
 
 PID = "demo_aquapure"
+
+
+def _three_scenario_project():
+    p = build_demo_project()
+    p.scenarios = []
+    scn.ensure_default(p)                                   # Base Case default
+    opt = ScenarioAssumption(name="Upside", scenario_type=ScenarioType.OPTIMISTIC,
+                             sales_volume_adjustment=20)
+    con = ScenarioAssumption(name="Downside", scenario_type=ScenarioType.CONSERVATIVE,
+                             sales_volume_adjustment=-15)
+    p.scenarios += [opt, con]
+    return p, p.scenarios[0], opt, con
 
 
 @pytest.fixture(scope="module")
@@ -137,3 +150,54 @@ def test_ensure_default_endpoint_and_set_default_endpoint(client):
     after = client.get(base).json()
     assert [s["id"] for s in after if s["is_default"]] == [new["id"]]
     client.delete(f"{base}/{new['id']}")
+
+
+# -- Pass 2: side-by-side scenario comparison (by id) ------------------------
+def _income_revenue(project, sid):
+    r = isvc.generate_income_statement(project, sid, "yearly")
+    sec = next(s for s in r.sections if s.key == "revenue")
+    return [round(x, 2) for x in sec.subtotal.values_by_period]
+
+
+def test_comparison_accepts_ids_for_two_scenarios():
+    p, base, opt, _con = _three_scenario_project()
+    cmp = fas.build_scenario_comparison(p, [base.id, opt.id], "yearly")
+    keys = {m.key for m in cmp.metrics}
+    assert {"revenue", "gross_profit", "gross_margin", "ebitda", "net_profit",
+            "cash_balance", "break_even", "funding_requirement"} <= keys
+    for m in cmp.metrics:
+        assert [s.scenario for s in m.series] == [base.id, opt.id]      # selected by id
+
+
+def test_comparison_works_for_three_scenarios():
+    p, base, opt, con = _three_scenario_project()
+    cmp = fas.build_scenario_comparison(p, [base.id, opt.id, con.id], "yearly")
+    rev = next(m for m in cmp.metrics if m.key == "revenue")
+    assert [s.scenario for s in rev.series] == [base.id, opt.id, con.id]
+    # optimistic (+20% volume) tops base tops conservative (-15%)
+    tot = {s.scenario: sum(s.values) for s in rev.series}
+    assert tot[opt.id] > tot[base.id] > tot[con.id]
+
+
+def test_comparison_metrics_match_individual_statement_output():
+    p, base, opt, _con = _three_scenario_project()
+    cmp = fas.build_scenario_comparison(p, [base.id, opt.id], "yearly")
+    rev = next(m for m in cmp.metrics if m.key == "revenue")
+    for s in rev.series:
+        assert s.values == _income_revenue(p, s.scenario)             # same engine, same numbers
+
+
+def test_comparison_unknown_id_falls_back_to_default_safely():
+    p, base, _opt, _con = _three_scenario_project()   # base is the default
+    cmp = fas.build_scenario_comparison(p, ["nope-not-real"], "yearly")
+    # unknown id resolves to the default scenario (route convention: safe fallback)
+    assert [s.scenario for s in cmp.metrics[0].series] == [base.id]
+
+
+def test_comparison_route_accepts_scenarios_query(client):
+    scns = client.get(f"/api/projects/{PID}/scenarios").json()
+    ids = ",".join(s["id"] for s in scns[:2]) if len(scns) >= 2 else scns[0]["id"]
+    r = client.get(f"/api/projects/{PID}/financial-analysis/scenario-comparison?scenarios={ids}&view=yearly")
+    assert r.status_code == 200
+    body = r.json()
+    assert any(m["key"] == "funding_requirement" for m in body["metrics"])

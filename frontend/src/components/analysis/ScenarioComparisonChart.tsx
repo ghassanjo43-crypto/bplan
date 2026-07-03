@@ -2,9 +2,11 @@ import type { ScenarioMetric } from '@/types/financialAnalysis'
 import type { ChartSeries } from '@/types/financialAnalysis'
 import { ProfessionalLineChart } from '@/components/charts/ProfessionalLineChart'
 
-const COLORS: Record<string, string> = { base: '#2563eb', conservative: '#d97706', optimistic: '#059669' }
+// Coloured by position, so it works for any set of scenario ids (not just the
+// three legacy types).
+const PALETTE = ['#2563eb', '#059669', '#d97706', '#7c3aed']
 
-/** Renders one scenario-comparison metric (base/conservative/optimistic) as a line chart card. */
+/** Renders one scenario-comparison metric (by scenario id) as a line chart card. */
 export function ScenarioComparisonChart({
   metric, periods, currency,
 }: {
@@ -17,8 +19,8 @@ export function ScenarioComparisonChart({
     for (const s of metric.series) row[s.scenario] = s.values[i] ?? 0
     return row
   })
-  const series: ChartSeries[] = metric.series.map((s) => ({
-    key: s.scenario, label: s.label, format: metric.format, color: COLORS[s.scenario] ?? '#64748b', axis: 'left',
+  const series: ChartSeries[] = metric.series.map((s, i) => ({
+    key: s.scenario, label: s.label, format: metric.format, color: PALETTE[i % PALETTE.length], axis: 'left',
   }))
   const unit = metric.format === 'percent' ? 'percent' : 'currency'
 

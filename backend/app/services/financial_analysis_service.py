@@ -554,28 +554,71 @@ def build_kpis_only(project, scenario, view):
     return build_kpi_dashboard(project, d)
 
 
-def build_scenario_comparison(project, view="yearly") -> ScenarioComparisonResponse:
+def _cumsum(arr) -> list[float]:
+    out, run = [], 0.0
+    for x in arr:
+        run += x
+        out.append(round(run, 2))
+    return out
+
+
+def build_scenario_comparison(project, scenario_ids=None, view="yearly") -> ScenarioComparisonResponse:
+    """Side-by-side comparison of 2–3 saved scenarios, selected by scenario id.
+
+    Every series comes from the same statement engines the individual Income
+    Statement / Balance Sheet / Cash Flow use (via ``_statement_data``), so the
+    numbers match exactly. Unknown ids fall back to the project's default
+    scenario (the route convention), never overwriting any assumptions.
+    """
+    from . import scenario_service as scn
+
     view = "monthly" if view == "monthly" else "yearly"
-    data = {sc: _enrich(project, _statement_data(project, sc, view)) for sc in ("base", "conservative", "optimistic")}
-    labels = data["base"]["labels"]
-    currency = data["base"]["currency"]
+    by_id = {s.id: s for s in project.scenarios}
+    default = next((s for s in project.scenarios if getattr(s, "is_default", False)),
+                   project.scenarios[0] if project.scenarios else None)
+
+    chosen: list = []
+    for sid in (scenario_ids or []):
+        s = by_id.get(sid) or default          # unknown id → default (safe fallback)
+        if s is not None and s.id not in {c.id for c in chosen}:
+            chosen.append(s)
+    if not chosen:                             # nothing requested → all saved (cap 3)
+        chosen = list(project.scenarios)[:3]
+    chosen = chosen[:3]
+
+    if chosen:
+        order = [s.id for s in chosen]
+        label_by_id = {s.id: scn.display_name(s) for s in chosen}
+    else:                                      # project with no scenarios at all
+        order = ["base"]
+        label_by_id = {"base": "Base Case"}
+
+    data = {sid: _enrich(project, _statement_data(project, sid, view)) for sid in order}
+    for sid in order:
+        d = data[sid]
+        d["cum_net"] = _cumsum(d["net"])       # break-even = crosses 0
+        pre_financing = _add(d["cf_operating"], d["cf_investing"])
+        d["funding_need"] = _cumsum(pre_financing)   # trough = peak external funding required
+
+    first = data[order[0]]
+    labels, currency = first["labels"], first["currency"]
 
     def metric(key, label, fmt, field):
         return ScenarioMetric(key=key, label=label, format=fmt, series=[
-            ScenarioSeries(scenario=sc, label=SCENARIO_LABELS[sc], values=[round(x, 2) for x in data[sc][field]])
-            for sc in ("base", "conservative", "optimistic")
+            ScenarioSeries(scenario=sid, label=label_by_id[sid],
+                           values=[round(x, 2) for x in data[sid][field]])
+            for sid in order
         ])
 
     metrics = [
         metric("revenue", "Revenue", "currency", "revenue"),
+        metric("gross_profit", "Gross profit", "currency", "gross_profit"),
+        metric("gross_margin", "Gross margin", "percent", "gross_margin"),
         metric("ebitda", "EBITDA", "currency", "ebitda"),
         metric("net_profit", "Net profit", "currency", "net"),
-        metric("closing_cash", "Closing cash", "currency", "cf_closing"),
-        metric("total_assets", "Total assets", "currency", "total_assets"),
-        metric("borrowings", "Total borrowings", "currency", "borrowings"),
-        metric("equity", "Total equity", "currency", "total_equity"),
-        metric("ebitda_margin", "EBITDA margin", "percent", "ebitda_margin"),
-        metric("net_margin", "Net profit margin", "percent", "net_margin"),
+        metric("cash_balance", "Cash balance (closing)", "currency", "cf_closing"),
+        metric("break_even", "Cumulative net profit (break-even at ≥ 0)", "currency", "cum_net"),
+        metric("funding_requirement", "Cumulative cash before financing (funding need = trough)", "currency", "funding_need"),
     ]
     return ScenarioComparisonResponse(
         project_id=project.id, project_name=project.name, view=view, currency=currency,

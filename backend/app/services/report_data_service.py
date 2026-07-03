@@ -235,7 +235,16 @@ def build_report_context(project: BusinessPlanProject, scenario: str, view: str,
     bs = bss.generate_balance_sheet(project, scenario, vv)
     cf = cfs.generate_cash_flow_statement(project, scenario, vv)
     fa = fas.generate_financial_analysis(project, scenario, vv)
-    scomp = fas.build_scenario_comparison(project, vv)
+    # The report's scenario snapshot is a fixed Base / Conservative / Optimistic
+    # 3-column layout (Word + Excel). Pick one saved scenario of each type by id
+    # and re-key the comparison series back to the type so the templates render
+    # unchanged even though the comparison engine is now scenario-id based.
+    _type_ids: dict[str, str] = {}
+    for s in project.scenarios:
+        _type_ids.setdefault(s.scenario_type.value, s.id)
+    _wanted = [_type_ids[t] for t in ("base", "conservative", "optimistic") if t in _type_ids]
+    scomp = fas.build_scenario_comparison(project, _wanted or None, vv)
+    _id_to_type = {s.id: s.scenario_type.value for s in project.scenarios}
     inc_sections = {s.key: s for s in inc.sections}
 
     periods = [p.label for p in inc.periods]
@@ -279,11 +288,14 @@ def build_report_context(project: BusinessPlanProject, scenario: str, view: str,
 
     # scenario comparison single-value table
     def scen_value(metric):
-        balance_keys = {"closing_cash", "total_assets", "borrowings", "equity"}
+        # End-of-horizon (last value) metrics — balances + cumulative series —
+        # rather than a sum over periods.
+        balance_keys = {"closing_cash", "total_assets", "borrowings", "equity",
+                        "cash_balance", "break_even", "funding_requirement"}
         out = {}
         for s in metric.series:
             v = s.values[-1] if metric.key in balance_keys or metric.format == "percent" else sum(s.values)
-            out[s.scenario] = v
+            out[_id_to_type.get(s.scenario, s.scenario)] = v   # key by type for the report layout
         return out
 
     scenario_rows = [{"label": m.label, "format": m.format, "values": scen_value(m)} for m in scomp.metrics]

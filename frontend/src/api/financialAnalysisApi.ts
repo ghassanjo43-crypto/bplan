@@ -17,10 +17,17 @@ export function useFinancialAnalysis(projectId: string | undefined, scenario: Sc
   })
 }
 
-export function useScenarioComparison(projectId: string | undefined, view: FAView) {
+export function useScenarioComparison(
+  projectId: string | undefined,
+  view: FAView,
+  scenarioIds?: string[],
+) {
+  const ids = scenarioIds?.filter(Boolean) ?? []
+  const idsParam = ids.length ? `&scenarios=${ids.join(',')}` : ''
   return useQuery({
-    queryKey: ['scenario-comparison', projectId, view],
-    queryFn: () => api.get<ScenarioComparisonResponse>(`/projects/${projectId}/financial-analysis/scenario-comparison?view=${view}`),
+    queryKey: ['scenario-comparison', projectId, view, ids.join(',')],
+    queryFn: () => api.get<ScenarioComparisonResponse>(
+      `/projects/${projectId}/financial-analysis/scenario-comparison?view=${view}${idsParam}`),
     enabled: !!projectId,
     retry: 2,
   })

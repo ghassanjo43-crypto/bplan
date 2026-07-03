@@ -12,6 +12,7 @@ import {
   useSaveCollectionItem,
 } from '@/api/hooks'
 import { useEnsureDefaultScenario, useSetDefaultScenario } from '@/api/scenariosApi'
+import { ScenarioCompareModal } from '@/components/analysis/ScenarioCompareModal'
 import { useProjectContext } from '@/layouts/ProjectContext'
 import { useToast } from '@/components/ui/Toast'
 import { scenarioTypeOptions } from '@/utils/options'
@@ -132,8 +133,14 @@ export function ScenariosPage() {
   const { notify } = useToast()
 
   const [modal, setModal] = useState<{ open: boolean; scenario: ScenarioAssumption | null }>({ open: false, scenario: null })
+  const [selected, setSelected] = useState<string[]>([])   // ids picked for comparison (2–3)
+  const [comparing, setComparing] = useState(false)
 
   const scenarios = useMemo(() => data ?? [], [data])
+
+  const toggleSelect = (id: string) =>
+    setSelected((cur) => cur.includes(id) ? cur.filter((x) => x !== id) : cur.length >= 3 ? cur : [...cur, id])
+  const canCompare = selected.length >= 2 && selected.length <= 3
 
   // Backfill a default Base Case for older projects on first open.
   useEffect(() => {
@@ -182,20 +189,29 @@ export function ScenariosPage() {
       />
 
       <div className="stack">
-        <SectionCard title="Saved Scenarios" subtitle={`${scenarios.length} scenario${scenarios.length === 1 ? '' : 's'}`} icon="⊡"
-          actions={<button className="btn btn--secondary btn--sm" onClick={() => setModal({ open: true, scenario: null })}>+ New</button>}>
+        <SectionCard title="Saved Scenarios" subtitle={`${scenarios.length} scenario${scenarios.length === 1 ? '' : 's'} · tick 2–3 to compare`} icon="⊡"
+          actions={<>
+            <button className="btn btn--secondary btn--sm" disabled={!canCompare} title={canCompare ? '' : 'Select 2 or 3 scenarios'} onClick={() => setComparing(true)}>⊟ Compare ({selected.length})</button>
+            <button className="btn btn--secondary btn--sm" onClick={() => setModal({ open: true, scenario: null })}>+ New</button>
+          </>}>
           {scenarios.length === 0 ? (
             <EmptyState icon="⊡" title="No scenarios yet" description="Create a scenario to model optimistic, conservative, or custom cases." />
           ) : (
             <div className="table-wrap">
               <table className="table">
                 <thead><tr>
+                  <th style={{ width: 34 }}></th>
                   <th>Scenario Name</th><th>Type</th><th>Description</th><th>Last Updated</th>
                   <th style={{ textAlign: 'center' }}>Default?</th><th style={{ textAlign: 'right' }}>Actions</th>
                 </tr></thead>
                 <tbody>
                   {scenarios.map((s) => (
                     <tr key={s.id}>
+                      <td style={{ textAlign: 'center' }}>
+                        <input type="checkbox" checked={selected.includes(s.id)}
+                          disabled={!selected.includes(s.id) && selected.length >= 3}
+                          onChange={() => toggleSelect(s.id)} aria-label={`Select ${s.name} to compare`} />
+                      </td>
                       <td><strong>{s.name || typeLabel(s.scenario_type)}</strong></td>
                       <td><Badge tone="blue">{typeLabel(s.scenario_type)}</Badge></td>
                       <td className="muted" style={{ maxWidth: 260 }}>{s.description || '—'}</td>
@@ -209,7 +225,6 @@ export function ScenariosPage() {
                         <div className="row" style={{ gap: 4, justifyContent: 'flex-end' }}>
                           <button className="btn btn--ghost btn--sm" onClick={() => setModal({ open: true, scenario: s })}>✏️ Open</button>
                           <button className="btn btn--ghost btn--sm" onClick={() => duplicate(s)}>⧉ Duplicate</button>
-                          <button className="btn btn--ghost btn--sm" title="Side-by-side comparison — coming next" disabled>⊟ Compare</button>
                           <button className="btn btn--ghost btn--sm" onClick={() => remove(s)}>🗑 Delete</button>
                         </div>
                       </td>
@@ -258,6 +273,10 @@ export function ScenariosPage() {
           onClose={() => setModal({ open: false, scenario: null })}
           onSubmit={handleSubmit}
         />
+      )}
+
+      {comparing && canCompare && projectId && (
+        <ScenarioCompareModal projectId={projectId} scenarioIds={selected} onClose={() => setComparing(false)} />
       )}
 
       <SaveBar slug="scenarios" />

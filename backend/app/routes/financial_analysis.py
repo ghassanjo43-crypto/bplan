@@ -42,6 +42,9 @@ def financial_analysis_kpis(project_id: str, scenario: str = Scenario, view: str
 
 
 @router.get("/scenario-comparison", response_model=ScenarioComparisonResponse)
-def scenario_comparison(project_id: str, view: str = View, service: ProjectService = Depends(get_service)):
+def scenario_comparison(project_id: str, view: str = View,
+                        scenarios: str | None = Query(None, description="Comma-separated scenario ids (2–3)"),
+                        service: ProjectService = Depends(get_service)):
     project = project_or_404(project_id, service)
-    return fas.build_scenario_comparison(project, view)
+    ids = [s.strip() for s in scenarios.split(",") if s.strip()] if scenarios else None
+    return fas.build_scenario_comparison(project, ids, view)
