@@ -2,6 +2,10 @@
 statement integration, and backward compatibility."""
 from __future__ import annotations
 
+import pytest
+from fastapi.testclient import TestClient
+
+from app.main import app
 from app.models.revenue_stream import RevenueStream
 from app.services import income_statement_service as isvc
 from app.services import revenue_stream_service as rss
@@ -88,3 +92,46 @@ def test_legacy_project_unaffected():
     # a project with no streams produces the same revenue as before this feature
     r = isvc.generate_income_statement(p, "base", "yearly")
     assert r.totals.total_revenue > 0
+
+
+# -- edit flow: PUT updates in place (regression for "cannot edit streams") --
+@pytest.fixture(scope="module")
+def client():
+    with TestClient(app) as c:
+        c.post("/api/demo/load-aquapure")
+        yield c
+
+
+def test_edit_updates_stream_without_creating_a_duplicate(client):
+    base = "/api/projects/demo_aquapure/revenue-streams"
+    forecast_url = "/api/projects/demo_aquapure/revenue-streams-forecast?view=yearly"
+    before = len(client.get(base).json())
+
+    created = client.post(base, json={
+        "name": "Editable", "stream_type": "revenue_only", "revenue_constant": 1000,
+    })
+    assert created.status_code == 201
+    sid = created.json()["id"]
+    assert len(client.get(base).json()) == before + 1
+
+    # forecast picks the new stream up: 1000/mo -> 12000 in year one
+    row = next(r for r in client.get(forecast_url).json()["rows"] if r["id"] == sid)
+    assert row["values"][0] == 12000
+
+    # Edit via PUT on the same id -> must update in place, not duplicate.
+    upd = client.put(f"{base}/{sid}", json={
+        **created.json(), "name": "Edited", "revenue_constant": 2000,
+    })
+    assert upd.status_code == 200
+    streams = client.get(base).json()
+    assert len(streams) == before + 1                       # no duplicate row
+    assert sum(1 for s in streams if s["id"] == sid) == 1
+    assert next(s for s in streams if s["id"] == sid)["name"] == "Edited"
+
+    # forecast reflects the edited amount automatically: 2000/mo -> 24000
+    row2 = next(r for r in client.get(forecast_url).json()["rows"] if r["id"] == sid)
+    assert row2["values"][0] == 24000
+
+    # delete confirmation lives in the UI; the API delete removes it cleanly.
+    assert client.delete(f"{base}/{sid}").status_code in (200, 204)
+    assert len(client.get(base).json()) == before

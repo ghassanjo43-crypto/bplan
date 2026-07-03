@@ -37,12 +37,11 @@ def projection_periods(project_id: str, mode: str = Mode, service: ProjectServic
 
 
 # -- Setup list aliases (Setup tabs) ---------------------------------------
-@router.get("/revenue-streams")
-def revenue_streams(project_id: str, service: ProjectService = Depends(get_service)):
-    project = project_or_404(project_id, service)
-    return project.products
-
-
+# NOTE: the former "/revenue-streams" alias (which returned project.products)
+# was removed — that slug now belongs to the Revenue Stream wizard's generic
+# collection router (GET/POST/PUT/DELETE over project.revenue_streams). Leaving
+# the alias here shadowed the collection GET, so the wizard's list read back
+# products and edits could not locate the stream being edited.
 @router.get("/direct-cost-items")
 def direct_cost_items(project_id: str, service: ProjectService = Depends(get_service)):
     project = project_or_404(project_id, service)

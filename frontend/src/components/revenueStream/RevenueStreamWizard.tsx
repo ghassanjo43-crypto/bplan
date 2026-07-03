@@ -10,7 +10,7 @@ import {
   useSaveCollectionItem,
   useSingletonSection,
 } from '@/api/hooks'
-import { useRevenueStreamsForecast } from '@/api/revenueStreamsApi'
+import { useRefreshRevenueDependents, useRevenueStreamsForecast } from '@/api/revenueStreamsApi'
 import { formatCurrency } from '@/utils/format'
 import type {
   BillingFrequency, ForecastInputMethod, ProjectSetup, RevenueStream, RevenueStreamType,
@@ -80,18 +80,26 @@ function DriverInput({ label, method, setMethod, constant, setConstant, values, 
   )
 }
 
-// -- the wizard modal ------------------------------------------------------
-function Wizard({ years, startYear, currency, onClose, onCreate, saving }: {
+// -- the wizard modal (create + edit) --------------------------------------
+function Wizard({ years, startYear, currency, onClose, onSubmit, saving, initial }: {
   years: number
   startYear: number
   currency: string
   onClose: () => void
-  onCreate: (body: Partial<RevenueStream>) => void
+  onSubmit: (body: Partial<RevenueStream>) => void
   saving: boolean
+  initial?: RevenueStream | null
 }) {
-  const [view, setView] = useState<'yearly' | 'monthly'>('yearly')
+  const isEdit = !!initial?.id
+  // Existing streams store their varying drivers at monthly resolution, so open
+  // an edited stream in the monthly view to show that data faithfully.
+  const editHasVarying = isEdit && [
+    initial?.quantity_method, initial?.price_method, initial?.signups_method, initial?.revenue_method,
+  ].includes('varying')
+  const [view, setView] = useState<'yearly' | 'monthly'>(editHasVarying ? 'monthly' : 'yearly')
   const [step, setStep] = useState(0)
-  const [f, setF] = useState<Partial<RevenueStream>>(blank())
+  // Merge onto blank() so streams created before a field existed still populate.
+  const [f, setF] = useState<Partial<RevenueStream>>(() => (initial ? { ...blank(), ...initial } : blank()))
   const [warn, setWarn] = useState<string | null>(null)
   const set = (p: Partial<RevenueStream>) => setF((cur) => ({ ...cur, ...p }))
 
@@ -228,18 +236,22 @@ function Wizard({ years, startYear, currency, onClose, onCreate, saving }: {
     if (f.price_method === 'varying') body.price_monthly = toMonthly(grid(f.price_monthly))
     if (f.signups_method === 'varying') body.signups_monthly = toMonthly(grid(f.signups_monthly))
     if (f.revenue_method === 'varying') body.revenue_monthly = toMonthly(grid(f.revenue_monthly))
-    onCreate(body)
+    // body carries `id` when editing (merged from `initial`), so the save hook
+    // PUTs to update the existing stream instead of POSTing a duplicate.
+    onSubmit(body)
   }
 
   return (
-    <Modal open wide title="Add Revenue Stream" onClose={onClose} footer={
+    <Modal open wide title={isEdit ? 'Edit Revenue Stream' : 'Add Revenue Stream'} onClose={onClose} footer={
       <div className="row row--between" style={{ width: '100%' }}>
         <button className="btn btn--ghost" onClick={onClose}>Discard &amp; Exit</button>
         <div className="row" style={{ gap: 8 }}>
           {step > 0 && <button className="btn btn--secondary" onClick={back}>← Back</button>}
           {!isLast
             ? <button className="btn btn--primary" onClick={next}>Next →</button>
-            : <button className="btn btn--primary" disabled={saving} onClick={submit}>{saving ? 'Creating…' : 'Create & Exit'}</button>}
+            : <button className="btn btn--primary" disabled={saving} onClick={submit}>
+                {saving ? (isEdit ? 'Saving…' : 'Creating…') : (isEdit ? 'Save Changes' : 'Create & Exit')}
+              </button>}
         </div>
       </div>
     }>
@@ -260,7 +272,63 @@ function Wizard({ years, startYear, currency, onClose, onCreate, saving }: {
   )
 }
 
-// -- panel: list + totals + Add button -------------------------------------
+// -- details / forecast viewer --------------------------------------------
+function methodSummary(method: ForecastInputMethod, constant: number, monthly: number[]) {
+  return method === 'constant' ? `Constant · ${constant}` : `Varying · ${monthly.length} periods`
+}
+
+function DetailsModal({ stream, row, periods, currency, onClose, onEdit }: {
+  stream: RevenueStream
+  row?: { values: number[]; total: number } | null
+  periods: string[]
+  currency: string
+  onClose: () => void
+  onEdit: () => void
+}) {
+  const t = stream.stream_type
+  return (
+    <Modal open title={`Details — ${stream.name}`} onClose={onClose} footer={
+      <div className="row row--between" style={{ width: '100%' }}>
+        <button className="btn btn--ghost" onClick={onClose}>Close</button>
+        <button className="btn btn--primary" onClick={onEdit}>Edit</button>
+      </div>
+    }>
+      <div className="stack--sm">
+        <div className="row" style={{ gap: 8, alignItems: 'center' }}>
+          <Badge tone="blue">{TYPE_LABEL[t]}</Badge>
+          {!stream.active && <Badge tone="neutral">Inactive</Badge>}
+        </div>
+        <ul className="muted" style={{ fontSize: 13, lineHeight: 1.8, margin: 0, paddingLeft: 18 }}>
+          {(t === 'unit_sales' || t === 'billable_hours') && <>
+            <li>{t === 'billable_hours' ? 'Billable hours' : 'Units sold'}: {methodSummary(stream.quantity_method, stream.quantity_constant, stream.quantity_monthly)}</li>
+            <li>{t === 'billable_hours' ? 'Hourly rate' : 'Unit price'}: {methodSummary(stream.price_method, stream.price_constant, stream.price_monthly)}</li>
+          </>}
+          {t === 'recurring_charges' && <>
+            <li>Starting customers: {stream.initial_customers}</li>
+            <li>New signups: {methodSummary(stream.signups_method, stream.signups_constant, stream.signups_monthly)}</li>
+            <li>Recurring charge: {formatCurrency(stream.recurring_charge, currency)} · billed {stream.billing_frequency}</li>
+            <li>Upfront fee per signup: {formatCurrency(stream.upfront_fee, currency)}</li>
+            <li>Monthly churn: {stream.churn_rate_percent}%</li>
+          </>}
+          {t === 'revenue_only' && <li>Total revenue: {methodSummary(stream.revenue_method, stream.revenue_constant, stream.revenue_monthly)}</li>}
+        </ul>
+        {row ? (
+          <div className="table-wrap" style={{ maxHeight: 240, overflow: 'auto' }}>
+            <table className="table">
+              <thead><tr>{periods.map((p) => <th key={p} style={{ textAlign: 'right' }}>{p}</th>)}<th style={{ textAlign: 'right' }}>Total</th></tr></thead>
+              <tbody><tr>
+                {row.values.map((v, i) => <td key={i} className="table__num">{formatCurrency(v, currency)}</td>)}
+                <td className="table__num"><strong>{formatCurrency(row.total, currency)}</strong></td>
+              </tr></tbody>
+            </table>
+          </div>
+        ) : <p className="muted" style={{ fontSize: 12.5 }}>Forecast not available yet.</p>}
+      </div>
+    </Modal>
+  )
+}
+
+// -- panel: list + totals + row actions (view / edit / delete) -------------
 export function RevenueStreamsSection() {
   const { projectId, currency } = useProjectContext()
   const { notify } = useToast()
@@ -270,12 +338,25 @@ export function RevenueStreamsSection() {
   const forecastQ = useRevenueStreamsForecast(projectId, view)
   const save = useSaveCollectionItem<RevenueStream>(projectId, 'revenue-streams')
   const del = useDeleteCollectionItem(projectId, 'revenue-streams')
-  const [open, setOpen] = useState(false)
+  const refreshDependents = useRefreshRevenueDependents(projectId)
+  const [creating, setCreating] = useState(false)
+  const [editing, setEditing] = useState<RevenueStream | null>(null)
+  const [viewing, setViewing] = useState<RevenueStream | null>(null)
 
   const years = yearsFromPeriod(setupQ.data?.projection_period)
   const startYear = setupQ.data?.projection_start_date ? new Date(setupQ.data.projection_start_date).getFullYear() : 2025
   const streams = streamsQ.data ?? []
   const fc = forecastQ.data
+  const streamById = (id: string) => streams.find((s) => s.id === id) ?? null
+
+  const closeWizard = () => { setCreating(false); setEditing(null) }
+  const removeStream = (id: string, name: string) => {
+    if (!window.confirm(`Delete “${name}”? This permanently removes the revenue stream and cannot be undone.`)) return
+    del.mutate(id, {
+      onSuccess: () => { refreshDependents(); notify('Revenue stream deleted') },
+      onError: (e) => notify((e as Error).message || 'Delete failed', 'error'),
+    })
+  }
 
   return (
     <SectionCard title="Revenue Streams" subtitle="Guided forecast builder — add unit sales, billable hours, recurring charges, or direct revenue." icon="◴"
@@ -284,14 +365,14 @@ export function RevenueStreamsSection() {
           <button type="button" className={`segmented__btn${view === 'yearly' ? ' segmented__btn--active' : ''}`} onClick={() => setView('yearly')}>Yearly</button>
           <button type="button" className={`segmented__btn${view === 'monthly' ? ' segmented__btn--active' : ''}`} onClick={() => setView('monthly')}>Monthly</button>
         </div>
-        <button className="btn btn--primary btn--sm" onClick={() => setOpen(true)}>+ Add Revenue Stream</button>
+        <button className="btn btn--primary btn--sm" onClick={() => setCreating(true)}>+ Add Revenue Stream</button>
       </>}>
       {streams.length === 0 ? (
         <p className="muted" style={{ fontSize: 13 }}>No revenue streams yet. Click <strong>+ Add Revenue Stream</strong> to build one with the wizard.</p>
       ) : (
         <div className="table-wrap">
           <table className="table">
-            <thead><tr><th>Stream</th><th>Type</th>{(fc?.periods ?? []).map((p) => <th key={p} style={{ textAlign: 'right' }}>{p}</th>)}<th style={{ textAlign: 'right' }}>Total</th><th></th></tr></thead>
+            <thead><tr><th>Stream</th><th>Type</th>{(fc?.periods ?? []).map((p) => <th key={p} style={{ textAlign: 'right' }}>{p}</th>)}<th style={{ textAlign: 'right' }}>Total</th><th style={{ textAlign: 'right' }}>Actions</th></tr></thead>
             <tbody>
               {(fc?.rows ?? []).map((r) => (
                 <tr key={r.id}>
@@ -299,8 +380,15 @@ export function RevenueStreamsSection() {
                   <td><Badge tone="blue">{TYPE_LABEL[r.stream_type]}</Badge></td>
                   {r.values.map((v, i) => <td key={i} className="table__num">{formatCurrency(v, currency)}</td>)}
                   <td className="table__num"><strong>{formatCurrency(r.total, currency)}</strong></td>
-                  <td style={{ textAlign: 'right' }}>
-                    <button className="btn btn--ghost btn--sm" onClick={() => { if (window.confirm(`Delete “${r.name}”?`)) del.mutate(r.id, { onSuccess: () => notify('Revenue stream deleted') }) }}>🗑</button>
+                  <td>
+                    <div className="row" style={{ gap: 4, justifyContent: 'flex-end' }}>
+                      <button className="btn btn--ghost btn--sm" title="View details / forecast" aria-label={`View ${r.name}`}
+                        onClick={() => setViewing(streamById(r.id))} disabled={!streamById(r.id)}>👁 View</button>
+                      <button className="btn btn--ghost btn--sm" title="Edit this revenue stream" aria-label={`Edit ${r.name}`}
+                        onClick={() => { const s = streamById(r.id); s ? setEditing(s) : notify('Stream is still loading — try again.', 'error') }} disabled={!streamById(r.id)}>✏️ Edit</button>
+                      <button className="btn btn--ghost btn--sm" title="Delete this revenue stream" aria-label={`Delete ${r.name}`}
+                        onClick={() => removeStream(r.id, r.name)}>🗑 Delete</button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -317,13 +405,25 @@ export function RevenueStreamsSection() {
         </div>
       )}
 
-      {open && (
-        <Wizard years={years} startYear={startYear} currency={currency} saving={save.isPending}
-          onClose={() => setOpen(false)}
-          onCreate={(body) => save.mutate(body as RevenueStream, {
-            onSuccess: () => { notify('Revenue stream created'); setOpen(false) },
-            onError: (e) => notify((e as Error).message || 'Create failed', 'error'),
+      {(creating || editing) && (
+        <Wizard key={editing?.id ?? 'new'} years={years} startYear={startYear} currency={currency} saving={save.isPending}
+          initial={editing}
+          onClose={closeWizard}
+          onSubmit={(body) => save.mutate(body as RevenueStream, {
+            onSuccess: () => {
+              refreshDependents()
+              notify(editing ? 'Revenue stream updated' : 'Revenue stream created')
+              closeWizard()
+            },
+            onError: (e) => notify((e as Error).message || 'Save failed', 'error'),
           })} />
+      )}
+
+      {viewing && (
+        <DetailsModal stream={viewing} row={fc?.rows.find((r) => r.id === viewing.id) ?? null}
+          periods={fc?.periods ?? []} currency={currency}
+          onClose={() => setViewing(null)}
+          onEdit={() => { setEditing(viewing); setViewing(null) }} />
       )}
     </SectionCard>
   )
