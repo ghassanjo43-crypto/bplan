@@ -154,14 +154,12 @@ export function ReviewPage() {
         <ReviewSection title="Project Setup" slug="setup" icon="◧" percent={sectionPercent('setup')} rows={setupRows} empty="Project setup has not been completed." />
 
         <ReviewSection
-          title="Products & Services" slug="products" icon="◫" percent={sectionPercent('products')}
+          title="Revenue & Direct Costs" slug="revenue" icon="◴" percent={sectionPercent('revenue')}
           rows={[
-            { label: 'Total Offerings', value: project.products.length },
-            { label: 'Active', value: project.products.filter((p) => p.active).length },
-            { label: 'Revenue Assumptions Set', value: project.revenue.length },
-            { label: 'Direct Costs Set', value: project.direct_costs.length },
+            { label: 'Revenue Assumptions', value: project.revenue.length },
+            { label: 'Direct Cost Items', value: project.direct_costs.length },
           ]}
-          empty="No products defined yet."
+          empty="No revenue defined yet."
         />
 
         <ReviewSection
@@ -263,7 +261,7 @@ export function ReviewPage() {
             ))}
           </div>
           <div className="muted text-mono" style={{ fontSize: 12, marginTop: 12 }}>
-            {formatNumber(project.products.length)} products · {formatNumber(project.staffing.length)} roles ·{' '}
+            {formatNumber(project.revenue.length)} revenue lines · {formatNumber(project.staffing.length)} roles ·{' '}
             {formatNumber(project.operating_expenses.length)} expenses captured
           </div>
         </SectionCard>

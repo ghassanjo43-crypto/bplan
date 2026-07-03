@@ -14,6 +14,7 @@ from .identity import ProjectSetup
 from .people import StaffRole
 from .planning import KPIAssumption, ScenarioAssumption
 from .projection import ProjectionData
+from .revenue_stream import RevenueStream
 from .text_plan import TextPlanDocument
 
 
@@ -33,6 +34,8 @@ class BusinessPlanProject(TimestampedModel):
     setup: ProjectSetup | None = None
     products: list[ProductService] = Field(default_factory=list)
     revenue: list[RevenueAssumption] = Field(default_factory=list)
+    # Add Revenue Stream wizard output (additive; empty for legacy projects).
+    revenue_streams: list[RevenueStream] = Field(default_factory=list)
     direct_costs: list[DirectCostItem] = Field(default_factory=list)
     staffing: list[StaffRole] = Field(default_factory=list)
     operating_expenses: list[OperatingExpense] = Field(default_factory=list)

@@ -5,9 +5,9 @@ import { ProjectionGrid } from '@/components/projection/ProjectionGrid'
 import { useProjectContext } from '@/layouts/ProjectContext'
 import { pageBySlug } from '@/routes/nav'
 import type { ProjectionSection } from '@/types/projection'
-import { RevenuePage } from './RevenuePage'
 import { DirectCostsPage } from './DirectCostsPage'
 import { OperatingExpensesPage } from './OperatingExpensesPage'
+import { RevenueStreamsSection } from '@/components/revenueStream/RevenueStreamWizard'
 
 function Workspace({
   slug,
@@ -57,7 +57,10 @@ export function RevenueWorkspace() {
       section="revenue"
       setupLabel="Revenue Setup"
       projectionLabel="Revenue Projection"
-      setup={<RevenuePage embedded />}
+      // Revenue Streams is the single primary revenue workflow. The legacy
+      // per-product RevenuePage is no longer embedded here (products are hidden);
+      // ProductService and its routes remain for backward compatibility.
+      setup={<RevenueStreamsSection />}
     />
   )
 }

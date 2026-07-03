@@ -29,16 +29,18 @@ const TEXT_PLAN_TOGGLES: { key: keyof ReportRequest; label: string; hint: string
 export function ReportOptionsForm({
   value,
   onChange,
+  projectId,
 }: {
   value: ReportRequest
   onChange: (next: ReportRequest) => void
+  projectId?: string
 }) {
   const set = (patch: Partial<ReportRequest>) => onChange({ ...value, ...patch })
 
   return (
     <div className="stack--sm">
       <div className="row row--wrap" style={{ gap: 28, alignItems: 'flex-end' }}>
-        <ScenarioSelector value={value.scenario} onChange={(s: ScenarioKey) => set({ scenario: s })} />
+        <ScenarioSelector projectId={projectId} value={value.scenario} onChange={(s: ScenarioKey) => set({ scenario: s })} />
         <PeriodViewToggle
           value={value.view}
           onChange={(v) => set({ view: v === 'yearly' ? 'yearly' : 'monthly' })}

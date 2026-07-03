@@ -244,6 +244,51 @@ def resolve_streams(
     return out
 
 
+# -- Unified revenue source (streams primary, products fallback) ------------
+@dataclass
+class RevSource:
+    """A revenue source direct costs can associate with — either a Revenue
+    Stream (primary) or, for legacy projects, a product/service."""
+    id: str
+    name: str
+    quantity: list[float]
+    price: list[float]
+    net: list[float]
+    customers: list[float]
+
+
+def resolve_revenue_sources(
+    project: BusinessPlanProject, n: int, start: date,
+    vol_factor: float = 1.0, price_factor: float = 1.0,
+) -> dict[str, RevSource]:
+    """Revenue sources keyed by id, used for direct-cost association + drivers.
+
+    When the project has any active revenue stream, the sources ARE the streams
+    (the primary workflow). Otherwise it falls back to the legacy per-product
+    resolution so existing product-only projects are unchanged.
+    """
+    from . import revenue_stream_service as rss
+
+    active_streams = [s for s in getattr(project, "revenue_streams", [])
+                      if getattr(s, "active", True)]
+    if active_streams:
+        out: dict[str, RevSource] = {}
+        for s in active_streams:
+            net = [round(v * vol_factor, 4) for v in rss.compute_monthly(s, n)]
+            qty, price, customers = rss.driver_series(s, n)
+            qty = [q * vol_factor for q in qty]
+            price = [p * price_factor for p in price]
+            out[s.id] = RevSource(id=s.id, name=s.name, quantity=qty, price=price,
+                                  net=net, customers=customers)
+        return out
+
+    return {
+        pid: RevSource(id=pid, name=rs.product.name, quantity=rs.quantity,
+                       price=rs.price, net=rs.net, customers=rs.customers)
+        for pid, rs in resolve_streams(project, n, start, vol_factor, price_factor).items()
+    }
+
+
 # -- Persistence + grid -----------------------------------------------------
 def ensure_persisted(project: BusinessPlanProject, n: int, start: date) -> bool:
     """Persist seeded schedules for any stream lacking one. Returns True if changed."""

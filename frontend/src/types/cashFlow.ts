@@ -2,7 +2,8 @@
 import type { Severity } from './incomeStatement'
 
 export type { Severity }
-export type ScenarioKey = 'base' | 'conservative' | 'optimistic'
+// A scenario id (named saved scenarios) or a legacy type string.
+export type ScenarioKey = string
 export type CFView = 'monthly' | 'yearly'
 
 export interface CashFlowPeriod {

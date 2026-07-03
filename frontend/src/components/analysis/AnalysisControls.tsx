@@ -30,7 +30,7 @@ export function AnalysisControls({
       <div className="card">
         <div className="card__body">
           <div className="row row--wrap" style={{ gap: 28, alignItems: 'flex-end' }}>
-            <ScenarioSelector value={scenario} onChange={onScenario} />
+            <ScenarioSelector projectId={projectId} value={scenario} onChange={onScenario} />
             <PeriodViewToggle value={view === 'yearly' ? 'yearly' : 'monthly'} onChange={(v) => onView(v === 'yearly' ? 'yearly' : 'monthly')} />
             <div className="spacer" />
             <div className="field" style={{ minWidth: 0 }}>

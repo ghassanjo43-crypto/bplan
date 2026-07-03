@@ -27,9 +27,8 @@ import {
 import type {
   CostCalculationMethod,
   DirectCostItem,
-  ProductService,
 } from '@/types'
-import { deriveMode, type AssociationMode } from '@/utils/directCosts'
+import { deriveMode, type Associable, type AssociationMode } from '@/utils/directCosts'
 import { formatPercent } from '@/utils/format'
 
 type Form = {
@@ -95,9 +94,9 @@ const schema = z
       else if (v.amount < 0) ctx.addIssue({ code: 'custom', path: ['amount'], message: 'Must be 0 or positive' })
     }
     if (v.association_mode === 'one' && v.product_ids.length !== 1)
-      ctx.addIssue({ code: 'custom', path: ['product_ids'], message: 'Select a product/service' })
+      ctx.addIssue({ code: 'custom', path: ['product_ids'], message: 'Select a revenue stream' })
     if (v.association_mode === 'multiple' && v.product_ids.length < 1)
-      ctx.addIssue({ code: 'custom', path: ['product_ids'], message: 'Select at least one product/service' })
+      ctx.addIssue({ code: 'custom', path: ['product_ids'], message: 'Select at least one revenue stream' })
 
     const spans = v.association_mode === 'all' || (v.association_mode === 'multiple' && v.product_ids.length > 1)
     if (spans && !v.allocation_method)
@@ -167,9 +166,9 @@ function toForm(item: DirectCostItem | null, prefill?: DirectCostPrefill): Form 
 }
 
 const MODE_OPTIONS: { value: AssociationMode; label: string }[] = [
-  { value: 'one', label: 'One product' },
+  { value: 'one', label: 'One revenue stream' },
   { value: 'multiple', label: 'Multiple' },
-  { value: 'all', label: 'All products' },
+  { value: 'all', label: 'All revenue streams' },
   { value: 'unassigned', label: 'Independent / unassigned' },
 ]
 
@@ -177,7 +176,7 @@ export function DirectCostModal({
   open,
   item,
   prefill,
-  products,
+  associations,
   currency,
   onClose,
   onSubmit,
@@ -186,7 +185,7 @@ export function DirectCostModal({
   open: boolean
   item: DirectCostItem | null
   prefill?: DirectCostPrefill
-  products: ProductService[]
+  associations: Associable[]
   currency: string
   onClose: () => void
   onSubmit: (payload: Partial<DirectCostItem>) => void
@@ -206,25 +205,25 @@ export function DirectCostModal({
   const isPercent = PERCENT_METHODS.includes(method)
   const spans = mode === 'all' || (mode === 'multiple' && productIds.length > 1)
 
-  const targetProducts = useMemo(
-    () => (mode === 'all' ? products : products.filter((p) => productIds.includes(p.id))),
-    [mode, productIds, products],
+  const targetAssoc = useMemo(
+    () => (mode === 'all' ? associations : associations.filter((a) => productIds.includes(a.id))),
+    [mode, productIds, associations],
   )
 
   if (!open) return null
 
-  const setManual = (productId: string, percent: number) => {
-    const next = targetProducts.map((p) => ({
-      product_id: p.id,
-      percent: p.id === productId ? percent : manual.find((m) => m.product_id === p.id)?.percent ?? 0,
+  const setManual = (assocId: string, percent: number) => {
+    const next = targetAssoc.map((a) => ({
+      product_id: a.id,
+      percent: a.id === assocId ? percent : manual.find((m) => m.product_id === a.id)?.percent ?? 0,
     }))
     setValue('manual_allocations', next, { shouldValidate: true })
   }
   const distributeEvenly = () => {
-    const each = targetProducts.length ? Math.round((100 / targetProducts.length) * 100) / 100 : 0
+    const each = targetAssoc.length ? Math.round((100 / targetAssoc.length) * 100) / 100 : 0
     setValue(
       'manual_allocations',
-      targetProducts.map((p) => ({ product_id: p.id, percent: each })),
+      targetAssoc.map((a) => ({ product_id: a.id, percent: each })),
       { shouldValidate: true },
     )
   }
@@ -245,9 +244,9 @@ export function DirectCostModal({
       allocation_method: spans ? (v.allocation_method as DirectCostItem['allocation_method']) : null,
       manual_allocations:
         spans && v.allocation_method === 'manual'
-          ? targetProducts.map((p) => ({
-              product_id: p.id,
-              percent: v.manual_allocations.find((m) => m.product_id === p.id)?.percent ?? 0,
+          ? targetAssoc.map((a) => ({
+              product_id: a.id,
+              percent: v.manual_allocations.find((m) => m.product_id === a.id)?.percent ?? 0,
             }))
           : [],
       supplier_name: v.supplier_name || null,
@@ -307,9 +306,9 @@ export function DirectCostModal({
         </SectionCard>
 
         {/* Association */}
-        <SectionCard title="Associated Revenue Stream" subtitle="Linked direct costs are driven by their product’s quantity or revenue. Choose “Independent / unassigned” for a cost that isn’t tied to a specific product (it stays out of cost of sales until assigned)." icon="◫">
+        <SectionCard title="Associated Revenue Stream" subtitle="Linked direct costs are driven by their revenue stream’s forecast quantity or revenue. Choose “Independent / unassigned” for a cost that isn’t tied to a specific stream (it stays out of cost of sales until assigned)." icon="◫">
           <Controller control={control} name="association_mode" render={({ field }) => (
-            <div className="segmented" style={{ marginBottom: targetProducts.length || mode === 'multiple' || mode === 'one' ? 16 : 0 }}>
+            <div className="segmented" style={{ marginBottom: targetAssoc.length || mode === 'multiple' || mode === 'one' ? 16 : 0 }}>
               {MODE_OPTIONS.map((o) => (
                 <button
                   key={o.value}
@@ -330,13 +329,13 @@ export function DirectCostModal({
 
           {mode === 'one' && (
             <Controller control={control} name="product_ids" render={({ field }) => (
-              <FormField label="Product / Service" required error={err.product_ids?.message as string | undefined}>
+              <FormField label="Revenue Stream" required error={err.product_ids?.message as string | undefined}>
                 <SelectInput
                   value={field.value[0] ?? null}
                   onChange={(v) => field.onChange(v ? [v] : [])}
-                  options={products.map((p) => ({ value: p.id, label: p.name }))}
+                  options={associations.map((a) => ({ value: a.id, label: a.name }))}
                   error={!!err.product_ids}
-                  placeholder={products.length ? 'Select a product/service' : 'Add products first'}
+                  placeholder={associations.length ? 'Select a revenue stream' : 'Add a revenue stream first'}
                 />
               </FormField>
             )} />
@@ -344,23 +343,23 @@ export function DirectCostModal({
 
           {mode === 'multiple' && (
             <Controller control={control} name="product_ids" render={({ field }) => (
-              <FormField label="Products / Services" required error={err.product_ids?.message as string | undefined}>
+              <FormField label="Revenue Streams" required error={err.product_ids?.message as string | undefined}>
                 <div className="check-list">
-                  {products.length === 0 && <span className="muted">Add products first.</span>}
-                  {products.map((p) => {
-                    const checked = field.value.includes(p.id)
+                  {associations.length === 0 && <span className="muted">Add a revenue stream first.</span>}
+                  {associations.map((a) => {
+                    const checked = field.value.includes(a.id)
                     return (
-                      <label key={p.id} className="check-list__item">
+                      <label key={a.id} className="check-list__item">
                         <input
                           type="checkbox"
                           checked={checked}
                           onChange={(e) =>
                             field.onChange(
-                              e.target.checked ? [...field.value, p.id] : field.value.filter((id) => id !== p.id),
+                              e.target.checked ? [...field.value, a.id] : field.value.filter((id) => id !== a.id),
                             )
                           }
                         />
-                        {p.name}
+                        {a.name}
                       </label>
                     )
                   })}
@@ -372,7 +371,7 @@ export function DirectCostModal({
           {mode === 'unassigned' && (
             <div className="banner banner--warning">
               <span className="banner__icon">⚠</span>
-              <div>This cost is <strong>independent / unassigned</strong> — not linked to any product, so it is excluded from cost of sales until you assign it. For a general overhead, consider Operating Expenses instead.</div>
+              <div>This cost is <strong>independent / unassigned</strong> — not linked to any revenue stream, so it is excluded from cost of sales until you assign it. For a general overhead, consider Operating Expenses instead.</div>
             </div>
           )}
         </SectionCard>
@@ -427,14 +426,14 @@ export function DirectCostModal({
                   </button>
                 </div>
                 <div className="stack--sm">
-                  {targetProducts.map((p) => (
-                    <div key={p.id} className="alloc-row">
-                      <span>{p.name}</span>
+                  {targetAssoc.map((a) => (
+                    <div key={a.id} className="alloc-row">
+                      <span>{a.name}</span>
                       <div style={{ width: 130 }}>
                         <div className="field__control">
                           <PercentageInput
-                            value={manual.find((m) => m.product_id === p.id)?.percent ?? 0}
-                            onChange={(v) => setManual(p.id, v ?? 0)}
+                            value={manual.find((m) => m.product_id === a.id)?.percent ?? 0}
+                            onChange={(v) => setManual(a.id, v ?? 0)}
                           />
                         </div>
                       </div>

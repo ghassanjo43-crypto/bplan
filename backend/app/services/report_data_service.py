@@ -235,7 +235,16 @@ def build_report_context(project: BusinessPlanProject, scenario: str, view: str,
     bs = bss.generate_balance_sheet(project, scenario, vv)
     cf = cfs.generate_cash_flow_statement(project, scenario, vv)
     fa = fas.generate_financial_analysis(project, scenario, vv)
-    scomp = fas.build_scenario_comparison(project, vv)
+    # The report's scenario snapshot is a fixed Base / Conservative / Optimistic
+    # 3-column layout (Word + Excel). Pick one saved scenario of each type by id
+    # and re-key the comparison series back to the type so the templates render
+    # unchanged even though the comparison engine is now scenario-id based.
+    _type_ids: dict[str, str] = {}
+    for s in project.scenarios:
+        _type_ids.setdefault(s.scenario_type.value, s.id)
+    _wanted = [_type_ids[t] for t in ("base", "conservative", "optimistic") if t in _type_ids]
+    scomp = fas.build_scenario_comparison(project, _wanted or None, vv)
+    _id_to_type = {s.id: s.scenario_type.value for s in project.scenarios}
     inc_sections = {s.key: s for s in inc.sections}
 
     periods = [p.label for p in inc.periods]
@@ -279,11 +288,14 @@ def build_report_context(project: BusinessPlanProject, scenario: str, view: str,
 
     # scenario comparison single-value table
     def scen_value(metric):
-        balance_keys = {"closing_cash", "total_assets", "borrowings", "equity"}
+        # End-of-horizon (last value) metrics — balances + cumulative series —
+        # rather than a sum over periods.
+        balance_keys = {"closing_cash", "total_assets", "borrowings", "equity",
+                        "cash_balance", "break_even", "funding_requirement"}
         out = {}
         for s in metric.series:
             v = s.values[-1] if metric.key in balance_keys or metric.format == "percent" else sum(s.values)
-            out[s.scenario] = v
+            out[_id_to_type.get(s.scenario, s.scenario)] = v   # key by type for the report layout
         return out
 
     scenario_rows = [{"label": m.label, "format": m.format, "values": scen_value(m)} for m in scomp.metrics]
@@ -312,7 +324,7 @@ def build_report_context(project: BusinessPlanProject, scenario: str, view: str,
                                        "description": sec.description, "charts": list(sec.charts)})
 
     ctx = dict(
-        currency=currency, scenario=scenario, scenario_label=SCENARIO_LABELS.get(scenario, scenario.title()),
+        currency=currency, scenario=scenario, scenario_label=isvc._scenario_adj(project, scenario).label,
         view=vv, periods=periods, app_name="Business Plan Studio",
         meta=dict(
             # Company (legal/reporting entity) comes from the parent Company
@@ -322,7 +334,7 @@ def build_report_context(project: BusinessPlanProject, scenario: str, view: str,
             title="Business Plan Financial Projection Report",
             subtitle=f"{_words(years)}-Year Projected Financial Study",
             period_range=f"{start_year}–{end_year}", currency=currency,
-            scenario_label=SCENARIO_LABELS.get(scenario, scenario.title()),
+            scenario_label=isvc._scenario_adj(project, scenario).label,
             prepared_date=date.today().strftime("%d %B %Y"),
             prepared_for=PREPARED_FOR.get(options.report_style, "Investors"),
             report_style=_lbl(options.report_style),
@@ -690,7 +702,7 @@ def build_report_preview(project, scenario, view, options):
         project_id=project.id, title="Business Plan Financial Projection Report",
         company=_company_name(project, setup),
         project_name=(setup.project_name if setup else None),
-        scenario=scenario, scenario_label=SCENARIO_LABELS.get(scenario, scenario.title()), view=view,
+        scenario=scenario, scenario_label=isvc._scenario_adj(project, scenario).label, view=view,
         currency=currency, period_range=f"{start_year}–{start_year + years - 1}",
         prepared_date=date.today().strftime("%d %B %Y"), prepared_for=PREPARED_FOR.get(options.report_style, "Investors"),
         sections=[ReportSection(key=k, title=t) for k, t in SECTIONS],

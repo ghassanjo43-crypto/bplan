@@ -67,9 +67,12 @@ def test_scenario_comparison(client):
     r = client.get("/api/projects/demo_aquapure/financial-analysis/scenario-comparison?view=yearly")
     assert r.status_code == 200
     d = r.json()
+    keys = {m["key"] for m in d["metrics"]}
+    assert {"revenue", "gross_profit", "gross_margin", "ebitda", "net_profit",
+            "cash_balance", "break_even", "funding_requirement"} <= keys
     rev = next(m for m in d["metrics"] if m["key"] == "revenue")
-    scenarios = {s["scenario"] for s in rev["series"]}
-    assert scenarios == {"base", "conservative", "optimistic"}
+    # Series are keyed by scenario id (not the legacy type string), 2–3 of them.
+    assert 2 <= len(rev["series"]) <= 3
 
 
 # 9. Does not crash with a near-empty project
@@ -111,11 +114,10 @@ def test_kpis_cover_groups(project):
     assert {"profitability", "liquidity", "leverage", "efficiency", "cash"} <= groups
 
 
-# Scenario revenue ordering (conservative < base < optimistic)
+# Scenario revenue ordering (conservative < base < optimistic), by scenario id
 def test_scenario_ordering(project):
-    sc = fas.build_scenario_comparison(project, "yearly")
+    by_id = {s.id: s.scenario_type.value for s in project.scenarios}
+    sc = fas.build_scenario_comparison(project, list(by_id), "yearly")
     rev = next(m for m in sc.metrics if m.key == "revenue")
-    base = sum(next(s for s in rev.series if s.scenario == "base").values)
-    cons = sum(next(s for s in rev.series if s.scenario == "conservative").values)
-    opt = sum(next(s for s in rev.series if s.scenario == "optimistic").values)
-    assert cons < base < opt
+    tot = {by_id[s.scenario]: sum(s.values) for s in rev.series}
+    assert tot["conservative"] < tot["base"] < tot["optimistic"]

@@ -19,6 +19,12 @@ class ScenarioAssumption(EntityBase):
     """
 
     scenario_type: ScenarioType = ScenarioType.BASE
+    # Named saved scenarios: `name` is the user-facing name; `label` is kept for
+    # backward compatibility (older data + the ScenarioAdj label). Exactly one
+    # scenario per project is the default (enforced by scenario_service).
+    name: str = Field(default="", max_length=120)
+    description: str | None = Field(default=None, max_length=2000)
+    is_default: bool = False
     label: str | None = Field(default=None, max_length=120)
 
     sales_volume_adjustment: float = 0

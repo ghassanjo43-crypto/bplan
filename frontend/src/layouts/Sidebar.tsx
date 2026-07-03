@@ -1,5 +1,5 @@
 import { NavLink, useParams } from 'react-router-dom'
-import { NAV_GROUPS, NAV_PAGES } from '@/routes/nav'
+import { NAV_GROUPS, VISIBLE_NAV_PAGES } from '@/routes/nav'
 import { useProjectContext } from './ProjectContext'
 
 export function Sidebar() {
@@ -17,14 +17,14 @@ export function Sidebar() {
       </div>
 
       {NAV_GROUPS.map((group) => {
-        const pages = NAV_PAGES.filter((p) => p.group === group)
+        const pages = VISIBLE_NAV_PAGES.filter((p) => p.group === group)
         return (
           <div className="sidebar__section" key={group}>
             <div className="sidebar__section-label">{group}</div>
             <nav className="sidebar__nav">
               {pages.map((page) => {
                 const done = page.sectionKey ? isSectionComplete(page.sectionKey) : false
-                const index = NAV_PAGES.indexOf(page) + 1
+                const index = VISIBLE_NAV_PAGES.indexOf(page) + 1
                 return (
                   <NavLink
                     key={page.slug}

@@ -70,7 +70,7 @@ export function ReportGeneratorPanel({ projectId }: { projectId: string }) {
         subtitle="Choose the scenario, level of detail, and audience for the business plan report."
         icon="⚙"
       >
-        <ReportOptionsForm value={options} onChange={setOptions} />
+        <ReportOptionsForm value={options} onChange={setOptions} projectId={projectId} />
       </SectionCard>
 
       <SectionCard title="Report preview" subtitle="What the generated document will contain." icon="◳">

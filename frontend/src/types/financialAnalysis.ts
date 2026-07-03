@@ -1,6 +1,7 @@
 /* Types mirroring backend/app/schemas/financial_analysis.py */
 
-export type ScenarioKey = 'base' | 'conservative' | 'optimistic'
+// A scenario id (named saved scenarios) or a legacy type string.
+export type ScenarioKey = string
 export type FAView = 'monthly' | 'yearly'
 export type Severity = 'info' | 'warning' | 'critical'
 export type ChartType =

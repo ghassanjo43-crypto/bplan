@@ -122,23 +122,46 @@ class ScenarioAdj:
     inflation: float = 0.0
 
 
-def _scenario_adj(project: BusinessPlanProject, scenario: str) -> ScenarioAdj:
-    for s in project.scenarios:
+def _resolve_scenario(project: BusinessPlanProject, scenario: str):
+    """Find the saved scenario for a request identifier.
+
+    Named scenarios are selected by id (the primary path); a legacy type string
+    ("base"/"conservative"/...) still matches by type; and when the identifier
+    doesn't match anything we fall back to the project's default scenario (else
+    None → a synthetic base case). This is the single point that makes the whole
+    statement engine scenario-id aware.
+    """
+    scenarios = project.scenarios
+    for s in scenarios:                       # by id (named scenarios)
+        if s.id == scenario:
+            return s
+    for s in scenarios:                       # by legacy type string
         if s.scenario_type.value == scenario:
-            return ScenarioAdj(
-                scenario_type=scenario,
-                label=s.label or scenario.title(),
-                sales_volume=s.sales_volume_adjustment,
-                selling_price=s.selling_price_adjustment,
-                direct_cost=s.direct_cost_adjustment,
-                salary=s.salary_adjustment,
-                rent=s.rent_adjustment,
-                marketing=s.marketing_adjustment,
-                customer_growth=s.customer_growth_adjustment,
-                interest_rate=s.interest_rate_adjustment,
-                tax_rate=s.tax_rate_adjustment,
-                inflation=s.inflation_adjustment,
-            )
+            return s
+    for s in scenarios:                       # the project default
+        if getattr(s, "is_default", False):
+            return s
+    return None
+
+
+def _scenario_adj(project: BusinessPlanProject, scenario: str) -> ScenarioAdj:
+    s = _resolve_scenario(project, scenario)
+    if s is not None:
+        stype = s.scenario_type.value
+        return ScenarioAdj(
+            scenario_type=stype,
+            label=(s.name or s.label or stype.title()),
+            sales_volume=s.sales_volume_adjustment,
+            selling_price=s.selling_price_adjustment,
+            direct_cost=s.direct_cost_adjustment,
+            salary=s.salary_adjustment,
+            rent=s.rent_adjustment,
+            marketing=s.marketing_adjustment,
+            customer_growth=s.customer_growth_adjustment,
+            interest_rate=s.interest_rate_adjustment,
+            tax_rate=s.tax_rate_adjustment,
+            inflation=s.inflation_adjustment,
+        )
     label = {"base": "Base Case", "conservative": "Conservative Case", "optimistic": "Optimistic Case"}.get(scenario, scenario.title())
     return ScenarioAdj(scenario_type=scenario, label=label)
 
@@ -271,6 +294,9 @@ def calculate_revenue(ctx: Ctx) -> dict[str, ProductModel]:
     project, scen, n, start = ctx.project, ctx.scen, ctx.n, ctx.start
     vol_factor = 1 + scen.sales_volume / 100.0
     price_factor = 1 + scen.selling_price / 100.0
+    # Per-product resolution — the source of truth for receivables / VAT / cash
+    # flow and for the legacy P&L path (income statement revenue is gated to use
+    # revenue streams when present, in _compute).
     resolved = rps.resolve_streams(project, n, start, vol_factor, price_factor)
     ctx._resolved_rev = resolved  # type: ignore[attr-defined]
 
@@ -304,11 +330,13 @@ def calculate_direct_costs(ctx: Ctx, products: dict[str, ProductModel]) -> dict[
     from . import direct_cost_projection_service as dcp
 
     project, scen, n, start = ctx.project, ctx.scen, ctx.n, ctx.start
-    resolved_rev = getattr(ctx, "_resolved_rev", None)
-    if resolved_rev is None:
-        from . import revenue_projection_service as rps
-        resolved_rev = rps.resolve_streams(project, n, start,
-                                            1 + scen.sales_volume / 100.0, 1 + scen.selling_price / 100.0)
+    # Direct costs associate with the unified revenue sources — revenue streams
+    # when the project has them, else legacy products. This is intentionally
+    # separate from ctx._resolved_rev (per-product, used by receivables/VAT).
+    from . import revenue_projection_service as rps
+    resolved_rev = rps.resolve_revenue_sources(
+        project, n, start,
+        1 + scen.sales_volume / 100.0, 1 + scen.selling_price / 100.0)
 
     resolved = dcp.resolve_items(project, n, start, resolved_rev,
                                  1 + scen.direct_cost / 100.0, scen.inflation)
@@ -652,14 +680,40 @@ def _compute(project: BusinessPlanProject, scenario: str) -> tuple[Ctx, dict]:
     # Revenue lines by IFRS type
     rev_lines: dict[str, list[float]] = {key: _zeros(n) for key, _, _ in REVENUE_LINES}
     rev_children: dict[str, list[IncomeStatementLineItem]] = {key: [] for key, _, _ in REVENUE_LINES}
-    for pid, pm in products.items():
-        key = REVENUE_TYPE_TO_LINE.get(pm.product.revenue_type.value, "other_revenue")
-        rev_lines[key] = _add(rev_lines[key], pm.revenue)
+    # Revenue Streams (the wizard) are the primary revenue source. When a project
+    # has any active revenue stream, revenue is taken *entirely* from the streams
+    # and the legacy per-product revenue is NOT added — this prevents
+    # double-counting for migrated projects. Projects with no revenue streams
+    # fall back to the legacy product/revenue model exactly as before. (The
+    # per-product `products` model is still resolved above because direct costs
+    # depend on it — e.g. per-customer, per-contract, and percent-of-revenue.)
+    from . import revenue_stream_service as rss
+    active_streams = [s for s in getattr(project, "revenue_streams", [])
+                      if getattr(s, "active", True)]
+
+    if not active_streams:
+        for pid, pm in products.items():
+            key = REVENUE_TYPE_TO_LINE.get(pm.product.revenue_type.value, "other_revenue")
+            rev_lines[key] = _add(rev_lines[key], pm.revenue)
+            rev_children[key].append(IncomeStatementLineItem(
+                key=f"rev_{pid}", label=pm.product.name, classification="revenue",
+                values_by_period=pm.revenue, total=sum(pm.revenue),
+                note=pm.product.revenue_type.value.replace("_", " "),
+            ))
+
+    # Each stream maps to an IFRS line and is scaled by the scenario sales-volume
+    # adjustment like product revenue.
+    vol_factor = 1 + ctx.scen.sales_volume / 100.0
+    for stream in active_streams:
+        monthly = [round(v * vol_factor, 4) for v in rss.compute_monthly(stream, n)]
+        key = rss.IFRS_LINE.get(stream.stream_type.value, "other_revenue")
+        rev_lines[key] = _add(rev_lines[key], monthly)
         rev_children[key].append(IncomeStatementLineItem(
-            key=f"rev_{pid}", label=pm.product.name, classification="revenue",
-            values_by_period=pm.revenue, total=sum(pm.revenue),
-            note=pm.product.revenue_type.value.replace("_", " "),
+            key=f"rs_{stream.id}", label=stream.name, classification="revenue",
+            values_by_period=monthly, total=sum(monthly),
+            note="revenue stream · " + stream.stream_type.value.replace("_", " "),
         ))
+
     total_revenue = _zeros(n)
     for key in rev_lines:
         total_revenue = _add(total_revenue, rev_lines[key])

@@ -40,10 +40,23 @@ from .services.seed import seed_if_empty
 from .storage import get_storage
 
 logger = logging.getLogger("businessplan")
+# Ensure our INFO diagnostics (e.g. the CORS allow-list logged on startup) are
+# visible under uvicorn on Render, which by default does not enable INFO on the
+# root logger. Attach a dedicated stdout handler once and stop propagating so we
+# never depend on / duplicate uvicorn's root configuration.
+if not logger.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(logging.Formatter("%(levelname)s:     %(name)s: %(message)s"))
+    logger.addHandler(_handler)
+    logger.setLevel(logging.INFO)
+    logger.propagate = False
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Log the effective CORS allow-list (non-secret) so deploys can confirm at a
+    # glance whether BP_CORS_ORIGINS was picked up. Never logs tokens/secrets.
+    logger.info("CORS origins loaded: %s", settings.cors_origins)
     if settings.seed_on_startup:
         seed_if_empty(get_storage())
     # Backfill the parent Company for any legacy projects (one-time, idempotent).
@@ -52,6 +65,12 @@ async def lifespan(app: FastAPI):
         company_service().migrate_all()
     except Exception:
         logger.exception("Company migration on startup failed")
+    # Backfill a default "Base Case" scenario for any project without scenarios.
+    try:
+        from .services import scenario_service
+        scenario_service.backfill_all(get_storage())
+    except Exception:
+        logger.exception("Scenario backfill on startup failed")
     # Seed the initial admin (+ dev users) so the app is reachable after login.
     try:
         from .services import auth_service
@@ -127,26 +146,51 @@ app.include_router(fixed_assets_router, prefix=settings.api_prefix)
 app.include_router(reports_router, prefix=settings.api_prefix)
 app.include_router(text_plan_router, prefix=settings.api_prefix)
 app.include_router(exports_router, prefix=settings.api_prefix)
+# Revenue-stream forecast (registered before the generic section router so its
+# static sub-path resolves ahead of /revenue-streams/{item_id}).
+from .routes.revenue_streams import router as revenue_streams_router  # noqa: E402
+app.include_router(revenue_streams_router, prefix=settings.api_prefix)
+# Scenario default / ensure-default (registered before the generic section
+# router so /scenarios/ensure-default + /scenarios/{id}/default resolve ahead of
+# the generic /scenarios/{item_id}).
+from .routes.scenarios import router as scenarios_router  # noqa: E402
+app.include_router(scenarios_router, prefix=settings.api_prefix)
 for section_router in build_section_routers():
     app.include_router(section_router, prefix=settings.api_prefix)
 
 
 # --------------------------------------------------------------------------
 # Serve the built React SPA (production single-service deployment).
-# In local dev the frontend runs on Vite; this block is a no-op when the
-# build output is absent.
+# In local dev the frontend runs on Vite; the catch-all is a no-op (returns a
+# normal 404) when the build output is absent.
+#
+# The catch-all is registered LAST, so every real backend route (all /api/*
+# routers, /health, /docs, /openapi.json) is matched first by Starlette and can
+# never be shadowed by the SPA. As a defensive second layer, the handler also
+# refuses to serve the SPA for these reserved path prefixes — so even if route
+# ordering ever regressed, /health and /api would return a real 404 (JSON) here
+# rather than silently returning index.html.
 # --------------------------------------------------------------------------
 _FRONTEND_DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
-if (_FRONTEND_DIST / "index.html").exists():
-    if (_FRONTEND_DIST / "assets").is_dir():
-        app.mount("/assets", StaticFiles(directory=_FRONTEND_DIST / "assets"), name="assets")
 
-    @app.get("/{full_path:path}", include_in_schema=False)
-    def spa(full_path: str):
-        # Never let the SPA fallback swallow unmatched API calls.
-        if full_path == "api" or full_path.startswith("api/"):
-            raise HTTPException(status_code=404, detail="Not found")
-        candidate = _FRONTEND_DIST / full_path
-        if full_path and candidate.is_file():
-            return FileResponse(candidate)
-        return FileResponse(_FRONTEND_DIST / "index.html")
+# First path segment that must always belong to the backend, never the SPA.
+_RESERVED_ROOTS = frozenset({"api", "health", "docs", "redoc", "openapi.json"})
+
+if (_FRONTEND_DIST / "assets").is_dir():
+    app.mount("/assets", StaticFiles(directory=_FRONTEND_DIST / "assets"), name="assets")
+
+
+@app.get("/{full_path:path}", include_in_schema=False)
+def spa(full_path: str):
+    # Never let the SPA fallback shadow a real backend route.
+    first_segment = full_path.split("/", 1)[0]
+    if first_segment in _RESERVED_ROOTS:
+        raise HTTPException(status_code=404, detail="Not found")
+    index = _FRONTEND_DIST / "index.html"
+    # API-only deployment (no built frontend present): behave like a plain 404.
+    if not index.exists():
+        raise HTTPException(status_code=404, detail="Not found")
+    candidate = _FRONTEND_DIST / full_path
+    if full_path and candidate.is_file():
+        return FileResponse(candidate)
+    return FileResponse(index)

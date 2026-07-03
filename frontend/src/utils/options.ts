@@ -238,6 +238,7 @@ export const scenarioTypeOptions: Option<ScenarioType>[] = [
   { value: 'base', label: 'Base Case' },
   { value: 'conservative', label: 'Conservative Case' },
   { value: 'optimistic', label: 'Optimistic Case' },
+  { value: 'custom', label: 'Custom' },
 ]
 
 export const directCostCategoryOptions: Option<DirectCostCategory>[] = [

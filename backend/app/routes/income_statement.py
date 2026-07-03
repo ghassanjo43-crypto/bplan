@@ -14,7 +14,7 @@ from ..services import ProjectService
 
 router = APIRouter(prefix="/projects/{project_id}/income-statement", tags=["income-statement"])
 
-Scenario = Query("base", pattern="^(base|conservative|optimistic)$")
+Scenario = Query("base")   # a scenario id or a legacy type; resolved server-side
 View = Query("yearly", pattern="^(monthly|yearly)$")
 
 
