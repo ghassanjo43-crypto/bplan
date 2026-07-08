@@ -1639,6 +1639,16 @@ h4 {
 .pgrid__input--selected {
   border-color: var(--blue-500);
 }
+.pgrid__label--selectable {
+  cursor: pointer;
+  user-select: none;
+}
+.pgrid__row--selected td {
+  background: var(--blue-50);
+}
+.pgrid__row--selected .pgrid__label {
+  box-shadow: inset 3px 0 0 var(--blue-500);
+}
 .pgrid tfoot .pgrid__totals td {
   padding: 10px;
   font-weight: 700;

@@ -7,6 +7,7 @@ import { useProjectionGrid, useSaveCells } from '@/api/projectionApi'
 import type { GridCell, ProjectionMode, ProjectionSection } from '@/types/projection'
 import { PRIMARY_FIELD } from '@/types/projection'
 import { formatStatementNumber } from '@/utils/statementFormat'
+import { computeGrowth, growthKey, numStr, type GrowthScope } from './growth'
 
 const SECTION_LABEL: Record<ProjectionSection, { driver: string; totalNoun: string; growthVerb: string }> = {
   revenue: { driver: 'units', totalNoun: 'net revenue', growthVerb: 'growth' },
@@ -18,11 +19,6 @@ function cellDriver(section: ProjectionSection, c: GridCell): number {
   if (section === 'revenue') return c.quantity ?? 0
   if (section === 'operating_expenses') return c.amount ?? 0
   return c.value // direct costs: edit the final cost (creates a manual override)
-}
-
-/** Plain editable string (no thousands separators while editing). */
-function numStr(n: number): string {
-  return Number.isInteger(n) ? String(n) : String(Number(n.toFixed(2)))
 }
 
 export function ProjectionGrid({
@@ -40,6 +36,9 @@ export function ProjectionGrid({
   // edited values keyed by `${item_id}:${period_index}` -> raw string
   const [edits, setEdits] = useState<Record<string, string>>({})
   const [selected, setSelected] = useState<{ item: string; period: number } | null>(null)
+  // The row targeted by row-level actions (Apply growth to "selected row").
+  const [selectedRow, setSelectedRow] = useState<string | null>(null)
+  const [scope, setScope] = useState<GrowthScope>('all')
   const [growthPct, setGrowthPct] = useState('')
   const [baseVal, setBaseVal] = useState('')
 
@@ -48,7 +47,9 @@ export function ProjectionGrid({
   const resetEdits = () => setEdits({})
 
   const periodCount = grid?.periods.length ?? 0
-  const keyOf = (item: string, period: number) => `${item}:${period}`
+  const keyOf = growthKey
+
+  const selectRow = (item: string) => setSelectedRow((cur) => (cur === item ? null : item))
 
   const valueFor = (item: string, c: GridCell): string => {
     const k = keyOf(item, c.period_index)
@@ -96,24 +97,21 @@ export function ProjectionGrid({
 
   const applyGrowth = () => {
     if (!grid) return
-    const g = Number(growthPct)
-    if (growthPct === '' || Number.isNaN(g)) {
-      notify('Enter a growth/inflation % first', 'error')
+    const result = computeGrowth({
+      scope,
+      selectedItemId: selectedRow,
+      rows: grid.rows.map((r) => ({ itemId: r.item_id, baseDriver: cellDriver(section, r.cells[0]) })),
+      periodCount,
+      growthPct,
+      base: baseVal,
+    })
+    if (!result.ok) {
+      notify(result.error, 'error')
       return
     }
-    const rate = g / 100
-    const targetRows = selected ? grid.rows.filter((r) => r.item_id === selected.item) : grid.rows
-    setEdits((e) => {
-      const next = { ...e }
-      for (const row of targetRows) {
-        const base = baseVal !== '' ? Number(baseVal) : cellDriver(section, row.cells[0])
-        for (let t = 0; t < periodCount; t++) {
-          next[keyOf(row.item_id, t)] = numStr(base * Math.pow(1 + rate, t))
-        }
-      }
-      return next
-    })
-    notify(`Applied ${labels.growthVerb} — review then Save changes`)
+    setEdits((e) => ({ ...e, ...result.edits }))
+    const target = scope === 'selected' ? 'selected row' : 'all rows'
+    notify(`Applied ${labels.growthVerb} to ${target} — review then Save changes`)
   }
 
   if (isLoading) return <LoadingScreen label="Loading projection grid…" />
@@ -143,14 +141,31 @@ export function ProjectionGrid({
           </div>
 
           <div className="field" style={{ minWidth: 0 }}>
-            <span className="field__label">
-              Apply {labels.growthVerb} {selected ? '(selected row)' : '(all rows)'}
-            </span>
-            <div className="row" style={{ gap: 6 }}>
+            <span className="field__label">Apply {labels.growthVerb} to</span>
+            <div className="row" style={{ gap: 6, alignItems: 'center' }}>
+              <div className="segmented">
+                <button
+                  className={`segmented__btn${scope === 'selected' ? ' segmented__btn--active' : ''}`}
+                  onClick={() => setScope('selected')}
+                >
+                  Selected row
+                </button>
+                <button
+                  className={`segmented__btn${scope === 'all' ? ' segmented__btn--active' : ''}`}
+                  onClick={() => setScope('all')}
+                >
+                  All rows
+                </button>
+              </div>
               <input className="input" style={{ width: 92 }} placeholder="base" value={baseVal} onChange={(e) => setBaseVal(e.target.value)} />
               <input className="input" style={{ width: 78 }} placeholder="% / period" value={growthPct} onChange={(e) => setGrowthPct(e.target.value)} />
               <button className="btn btn--secondary btn--sm" onClick={applyGrowth}>Apply</button>
             </div>
+            {scope === 'selected' && !selectedRow && (
+              <span className="field__label" style={{ color: 'var(--amber-500)', marginTop: 4 }}>
+                ⚠ No row selected — click a row in the grid first.
+              </span>
+            )}
           </div>
 
           <button className="btn btn--secondary btn--sm" onClick={fillRight}>⟶ Fill right</button>
@@ -198,9 +213,17 @@ export function ProjectionGrid({
                     </tr>
                   </thead>
                   <tbody>
-                    {grid.rows.map((row) => (
-                      <tr key={row.item_id}>
-                        <td className="pgrid__label">
+                    {grid.rows.map((row) => {
+                      const rowSelected = selectedRow === row.item_id
+                      return (
+                      <tr key={row.item_id} className={rowSelected ? 'pgrid__row--selected' : undefined}>
+                        <td
+                          className="pgrid__label pgrid__label--selectable"
+                          onClick={() => selectRow(row.item_id)}
+                          role="button"
+                          aria-pressed={rowSelected}
+                          title="Click to select this row"
+                        >
                           <strong>{row.label}</strong>
                           {row.group && <span className="pgrid__group">{row.group}</span>}
                         </td>
@@ -213,7 +236,7 @@ export function ProjectionGrid({
                               <input
                                 className={`pgrid__input${edited ? ' pgrid__input--edited' : ''}${isSel ? ' pgrid__input--selected' : ''}`}
                                 value={valueFor(row.item_id, c)}
-                                onFocus={() => setSelected({ item: row.item_id, period: c.period_index })}
+                                onFocus={() => { setSelected({ item: row.item_id, period: c.period_index }); setSelectedRow(row.item_id) }}
                                 onChange={(e) =>
                                   setEdits((prev) => ({ ...prev, [k]: e.target.value }))
                                 }
@@ -224,7 +247,8 @@ export function ProjectionGrid({
                         })}
                         <td className="pgrid__num pgrid__total">{formatStatementNumber(row.total)}</td>
                       </tr>
-                    ))}
+                      )
+                    })}
                   </tbody>
                   <tfoot>
                     <tr className="pgrid__totals">
