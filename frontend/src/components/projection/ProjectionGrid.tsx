@@ -8,11 +8,19 @@ import type { GridCell, ProjectionMode, ProjectionSection } from '@/types/projec
 import { PRIMARY_FIELD } from '@/types/projection'
 import { formatStatementNumber } from '@/utils/statementFormat'
 import { computeGrowth, growthKey, numStr, type GrowthScope } from './growth'
+import { buildProjectionCsv, downloadCsv } from './projectionCsv'
 
 const SECTION_LABEL: Record<ProjectionSection, { driver: string; totalNoun: string; growthVerb: string }> = {
   revenue: { driver: 'units', totalNoun: 'net revenue', growthVerb: 'growth' },
   direct_costs: { driver: 'cost', totalNoun: 'cost of sales', growthVerb: 'inflation' },
   operating_expenses: { driver: 'amount', totalNoun: 'operating expense', growthVerb: 'inflation' },
+}
+
+/** Filename prefix used for CSV export, e.g. "revenue-projection-monthly.csv". */
+const CSV_FILE_PREFIX: Record<ProjectionSection, string> = {
+  revenue: 'revenue-projection',
+  direct_costs: 'direct-cost-projection',
+  operating_expenses: 'operating-expense-projection',
 }
 
 function cellDriver(section: ProjectionSection, c: GridCell): number {
@@ -114,6 +122,30 @@ export function ProjectionGrid({
     notify(`Applied ${labels.growthVerb} to ${target} — review then Save changes`)
   }
 
+  const exportCsv = () => {
+    if (!grid || grid.rows.length === 0) {
+      notify('Nothing to export yet', 'error')
+      return
+    }
+    const csv = buildProjectionCsv({
+      periodLabels: grid.periods.map((p) => p.period_label),
+      rows: grid.rows.map((r) => ({
+        itemId: r.item_id,
+        label: r.label,
+        description: r.group ?? r.note ?? '',
+        cells: r.cells.map((c) => ({ periodIndex: c.period_index, driver: cellDriver(section, c) })),
+        total: r.total,
+      })),
+      edits,
+      totalsByPeriod: grid.totals_by_period,
+      grandTotal: grid.grand_total,
+      totalNoun: labels.totalNoun,
+      currency: grid.currency,
+    })
+    downloadCsv(`${CSV_FILE_PREFIX[section]}-${mode}.csv`, csv)
+    notify('CSV exported')
+  }
+
   if (isLoading) return <LoadingScreen label="Loading projection grid…" />
   if (isError || !grid) {
     return (
@@ -170,7 +202,7 @@ export function ProjectionGrid({
 
           <button className="btn btn--secondary btn--sm" onClick={fillRight}>⟶ Fill right</button>
           <div className="spacer" />
-          <button className="btn btn--secondary btn--sm" disabled title="Coming in a later phase">⤓ CSV</button>
+          <button className="btn btn--secondary btn--sm" onClick={exportCsv} disabled={grid.rows.length === 0} title="Download the visible grid as CSV">⤓ CSV</button>
           {dirty && <span className="badge badge--amber badge--dot">{Object.keys(edits).length} unsaved</span>}
           <button className="btn btn--primary" onClick={save} disabled={!dirty || saveCells.isPending}>
             {saveCells.isPending ? <><Spinner /> Saving…</> : 'Save changes'}
