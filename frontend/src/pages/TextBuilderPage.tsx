@@ -8,6 +8,7 @@ import { TextPlanRightPanel } from '@/components/textPlan/TextPlanRightPanel'
 import { OutlineSuggestionModal } from '@/components/textPlan/OutlineSuggestionModal'
 import { TextPlanCompletionBadge } from '@/components/textPlan/TextPlanCompletionBadge'
 import { HelpTooltip } from '@/components/ui/HelpTooltip'
+import { tbGridClass } from './textBuilderLayout'
 import {
   useCreateSection,
   useCreateTopic,
@@ -115,7 +116,7 @@ export function TextBuilderPage() {
   }
 
   return (
-    <div className={`tb${leftCollapsed ? ' tb--left-collapsed' : ''}${rightCollapsed ? ' tb--right-collapsed' : ''}`}>
+    <div className={tbGridClass(leftCollapsed, rightCollapsed)}>
       {/* Left: outline navigator (collapsible) */}
       {leftCollapsed ? (
         <aside className="tb-col tb-col--left">

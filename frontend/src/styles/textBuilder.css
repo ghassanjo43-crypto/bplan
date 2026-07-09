@@ -107,6 +107,13 @@
 
 .tb-topic-actions { display: flex; gap: 6px; justify-content: flex-end; margin-bottom: 8px; }
 
+/* The center editor must be free to grow into the full column width when the
+   side panels are collapsed (min-width:0 lets the grid track actually shrink,
+   width:100%/max-width:none prevent any inherited cap from constraining it). */
+.tb-col--center { min-width: 0; }
+.tb-col--center .tb-editor,
+.tb-col--center .rte { width: 100%; max-width: none; min-width: 0; }
+
 .tb-editor { display: flex; flex-direction: column; gap: 12px; }
 .tb-editor__bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .tb-title-input {
