@@ -111,6 +111,12 @@ class Settings:
     anthropic_model: str = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-5").strip()
     ai_max_tokens: int = int(os.getenv("AI_MAX_TOKENS", "1500"))
     ai_timeout_seconds: int = int(os.getenv("AI_TIMEOUT_SECONDS", "60"))
+    # TLS for outbound AI calls. On a network with HTTPS inspection (corporate
+    # proxy / antivirus), point AI_CA_BUNDLE at the interceptor's PEM, or — for
+    # local dev only — set AI_SSL_VERIFY=false to skip verification. Production
+    # should leave verification on (the default).
+    ai_ca_bundle: str = os.getenv("AI_CA_BUNDLE", "").strip()
+    ai_verify_ssl: bool = os.getenv("AI_SSL_VERIFY", "true").lower() != "false"
 
 
 settings = Settings()

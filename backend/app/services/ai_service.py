@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import logging
+import ssl
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -225,11 +226,30 @@ def build_prompt(request: AiGenerateRequest, context: str) -> tuple[str, str]:
 # --------------------------------------------------------------------------
 # provider calls (HTTP via stdlib — no extra dependency)
 # --------------------------------------------------------------------------
+def _ssl_context() -> ssl.SSLContext | None:
+    """SSL context for outbound AI calls.
+
+    Honours a custom CA bundle, or (local dev only) disables verification for
+    networks doing HTTPS inspection. Returns None to use urllib's default.
+    """
+    if settings.ai_ca_bundle:
+        return ssl.create_default_context(cafile=settings.ai_ca_bundle)
+    if not settings.ai_verify_ssl:
+        logger.warning("AI_SSL_VERIFY=false: outbound AI TLS verification is DISABLED "
+                       "(intended for local dev behind HTTPS inspection only).")
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        return ctx
+    return None
+
+
 def _http_post_json(url: str, headers: dict, payload: dict) -> dict:
     data = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(url, data=data, headers=headers, method="POST")
     try:
-        with urllib.request.urlopen(req, timeout=settings.ai_timeout_seconds) as resp:
+        with urllib.request.urlopen(req, timeout=settings.ai_timeout_seconds,
+                                    context=_ssl_context()) as resp:
             return json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
         body = ""
