@@ -71,5 +71,18 @@ class Settings:
     # Dev-only finance user assigned to the demo company (for tenant-isolation testing).
     seed_dev_users: bool = os.getenv("BP_SEED_DEV_USERS", "true").lower() == "true"
 
+    # AI narrative generation --------------------------------------------------
+    # Provider selection + API keys are read ONLY from the backend environment;
+    # the key is never sent to or exposed to the frontend. AI_PROVIDER may be
+    # "openai" or "anthropic"; when unset it is inferred from whichever key is
+    # present. If no key is configured the endpoint returns a clear 503.
+    ai_provider: str = os.getenv("AI_PROVIDER", "").strip().lower()
+    openai_api_key: str = os.getenv("OPENAI_API_KEY", "").strip()
+    anthropic_api_key: str = os.getenv("ANTHROPIC_API_KEY", "").strip()
+    openai_model: str = os.getenv("OPENAI_MODEL", "gpt-4o-mini").strip()
+    anthropic_model: str = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-5").strip()
+    ai_max_tokens: int = int(os.getenv("AI_MAX_TOKENS", "1500"))
+    ai_timeout_seconds: int = int(os.getenv("AI_TIMEOUT_SECONDS", "60"))
+
 
 settings = Settings()

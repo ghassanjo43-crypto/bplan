@@ -1,5 +1,5 @@
-import { useRef, useState } from 'react'
-import { EditorContent, useEditor, type JSONContent } from '@tiptap/react'
+import { useEffect, useRef, useState } from 'react'
+import { EditorContent, useEditor, type Editor, type JSONContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Underline from '@tiptap/extension-underline'
 import Link from '@tiptap/extension-link'
@@ -22,6 +22,7 @@ export function RichTextEditor({
   content,
   editable = true,
   onChange,
+  onReady,
   uploadImage,
   onUploadError,
   placeholder = 'Start writing this topic…',
@@ -29,6 +30,8 @@ export function RichTextEditor({
   content: string | JSONContent
   editable?: boolean
   onChange?: (html: string, json: JSONContent, text: string) => void
+  /** Exposes the underlying editor so callers can insert/replace content. */
+  onReady?: (editor: Editor) => void
   uploadImage?: (file: File) => Promise<TextPlanImage>
   onUploadError?: (error: unknown) => void
   placeholder?: string
@@ -43,6 +46,10 @@ export function RichTextEditor({
     onUpdate: ({ editor }) => onChange?.(editor.getHTML(), editor.getJSON(), editor.getText()),
     editorProps: { attributes: { class: 'rte-content' } },
   })
+
+  useEffect(() => {
+    if (editor) onReady?.(editor)
+  }, [editor, onReady])
 
   if (!editable) {
     return (
