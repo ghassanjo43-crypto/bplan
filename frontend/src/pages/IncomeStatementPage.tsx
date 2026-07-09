@@ -31,6 +31,7 @@ export function IncomeStatementPage() {
       <PageHeader
         breadcrumb="Financial Statements"
         title="Income Statement"
+        helpKey="income.statement"
         subtitle="An IFRS-style Statement of Profit or Loss generated from your assumptions."
       />
 

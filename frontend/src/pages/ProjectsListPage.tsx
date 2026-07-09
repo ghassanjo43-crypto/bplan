@@ -10,6 +10,7 @@ import { CompanyProfileCard } from '@/components/company/CompanyProfileCard'
 import { ProjectCard } from '@/components/company/ProjectCard'
 import { EditCompanyModal } from '@/components/company/EditCompanyModal'
 import { UserMenu } from '@/components/auth/UserMenu'
+import { HelpTooltip } from '@/components/ui/HelpTooltip'
 import type { ProjectSummary } from '@/types'
 
 export function ProjectsListPage() {
@@ -111,7 +112,7 @@ export function ProjectsListPage() {
                   reloadDisabled={loadDemo.isPending}
                 />
                 <div className="row row--between" style={{ margin: '22px 2px 12px' }}>
-                  <h2 style={{ fontSize: 17 }}>Projects</h2>
+                  <h2 style={{ fontSize: 17 }}><HelpTooltip helpKey="dashboard.overview">Projects</HelpTooltip></h2>
                   <button className="btn btn--secondary btn--sm" onClick={() => addProject(company.id)} disabled={createProject.isPending}>
                     + Create New Project
                   </button>

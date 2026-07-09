@@ -7,6 +7,7 @@ import { useProjectionGrid, useSaveCells } from '@/api/projectionApi'
 import type { GridCell, ProjectionMode, ProjectionSection } from '@/types/projection'
 import { PRIMARY_FIELD } from '@/types/projection'
 import { formatStatementNumber } from '@/utils/statementFormat'
+import { HelpTooltip } from '@/components/ui/HelpTooltip'
 import { computeGrowth, growthKey, numStr, type GrowthScope } from './growth'
 import { buildProjectionCsv, downloadCsv } from './projectionCsv'
 
@@ -173,7 +174,9 @@ export function ProjectionGrid({
           </div>
 
           <div className="field" style={{ minWidth: 0 }}>
-            <span className="field__label">Apply {labels.growthVerb} to</span>
+            <span className="field__label">
+              <HelpTooltip helpKey="revenue.growth">Apply {labels.growthVerb} to</HelpTooltip>
+            </span>
             <div className="row" style={{ gap: 6, alignItems: 'center' }}>
               <div className="segmented">
                 <button

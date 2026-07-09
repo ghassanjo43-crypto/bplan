@@ -9,6 +9,13 @@ import { DirectCostsPage } from './DirectCostsPage'
 import { OperatingExpensesPage } from './OperatingExpensesPage'
 import { RevenueStreamsSection } from '@/components/revenueStream/RevenueStreamWizard'
 
+// Header help copy per section workspace (Guided Help mode).
+const SLUG_HELP_KEYS: Record<string, string> = {
+  revenue: 'revenue.streams',
+  'direct-costs': 'direct.costs',
+  'operating-expenses': 'operating.expenses',
+}
+
 function Workspace({
   slug,
   section,
@@ -32,6 +39,7 @@ function Workspace({
         breadcrumb={`Business Plan · ${page?.group ?? ''}`}
         title={page?.label ?? ''}
         subtitle={page?.subtitle}
+        helpKey={SLUG_HELP_KEYS[slug]}
       />
 
       <div className="tabs">

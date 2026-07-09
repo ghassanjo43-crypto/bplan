@@ -7,6 +7,7 @@ import { TopicEditorPanel } from '@/components/textPlan/TopicEditorPanel'
 import { TextPlanRightPanel } from '@/components/textPlan/TextPlanRightPanel'
 import { OutlineSuggestionModal } from '@/components/textPlan/OutlineSuggestionModal'
 import { TextPlanCompletionBadge } from '@/components/textPlan/TextPlanCompletionBadge'
+import { HelpTooltip } from '@/components/ui/HelpTooltip'
 import {
   useCreateSection,
   useCreateTopic,
@@ -130,7 +131,7 @@ export function TextBuilderPage() {
             <button className="tb-collapse-btn" title="Collapse outline" onClick={() => collapseLeft(true)}>
               ‹
             </button>
-            Outline
+            <HelpTooltip helpKey="narrative.editor">Outline</HelpTooltip>
           </span>
           <button className="btn btn--secondary btn--sm" onClick={addSection}>
             ＋ Section

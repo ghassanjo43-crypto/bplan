@@ -4,6 +4,7 @@ import { RichTextEditor } from '@/components/editor/RichTextEditor'
 import { useToast } from '@/components/ui/Toast'
 import { AutosaveIndicator, type SaveState } from './AutosaveIndicator'
 import { AiAssistantModal, type AiModalPreset } from './AiAssistantModal'
+import { HelpTooltip } from '@/components/ui/HelpTooltip'
 import { QUICK_ACTIONS } from './aiAssistant'
 import { uploadTopicImage, useUpdateTopic } from '@/api/textPlanApi'
 import type { TextPlanTopic, TopicStatus } from '@/types/textPlan'
@@ -159,9 +160,11 @@ export function TopicEditorPanel({ projectId, topic }: { projectId: string; topi
       </p>
 
       <div className="tb-ai-row">
-        <button className="btn btn--primary btn--sm" onClick={() => openAi()}>
-          ✨ Generate with AI
-        </button>
+        <HelpTooltip helpKey="ai.generateText">
+          <button className="btn btn--primary btn--sm" onClick={() => openAi()}>
+            ✨ Generate with AI
+          </button>
+        </HelpTooltip>
         <span className="muted" style={{ fontSize: 12 }}>Quick actions:</span>
         {QUICK_ACTIONS.map((q) => (
           <button

@@ -184,6 +184,7 @@ export function ScenariosPage() {
       <PageHeader
         breadcrumb="Business Plan · Planning"
         title="Scenarios"
+        helpKey="scenarios"
         subtitle="Save multiple named scenarios per plan. Each keeps its own assumptions; the base plan is never overwritten."
         actions={<button className="btn btn--primary" onClick={() => setModal({ open: true, scenario: null })}>+ New Scenario</button>}
       />

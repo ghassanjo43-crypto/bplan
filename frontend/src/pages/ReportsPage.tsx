@@ -10,6 +10,7 @@ export function ReportsPage() {
       <PageHeader
         breadcrumb="Reporting"
         title="Business Plan Report"
+        helpKey="reports"
         subtitle="Generate a complete, investor-ready business plan document (Word, PDF) or a live Excel financial model."
         actions={<ExcelModelButton projectId={projectId} className="btn btn--primary" />}
       />
