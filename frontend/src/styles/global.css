@@ -68,6 +68,13 @@ h4 {
   width: 100%;
   margin: 0 auto;
 }
+/* The Text Builder is a full-width writing studio that manages its own three
+   columns, so it opts out of the centered max-width cap — otherwise collapsing
+   the side panels only reflows space inside 1180px and leaves large grey
+   gutters. Other pages keep the comfortable centered width. */
+.app-content:has(.tb) {
+  max-width: none;
+}
 
 /* ==========================================================================
    Sidebar
