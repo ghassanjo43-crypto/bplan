@@ -180,6 +180,7 @@ export function DirectCostsPage({ embedded }: { embedded?: boolean } = {}) {
         <PageHeader
           breadcrumb="Business Plan · Revenue & Costs"
           title="Direct Costs / Cost of Goods Sold"
+          helpKey="direct.costs"
           subtitle="Build flexible direct-cost items and associate each with one, many, all, or no revenue streams."
           actions={
             <button className="btn btn--primary" onClick={() => setModal({ open: true, item: null })}>

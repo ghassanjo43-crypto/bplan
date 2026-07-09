@@ -1,8 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
-import type { JSONContent } from '@tiptap/react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import type { Editor, JSONContent } from '@tiptap/react'
 import { RichTextEditor } from '@/components/editor/RichTextEditor'
 import { useToast } from '@/components/ui/Toast'
 import { AutosaveIndicator, type SaveState } from './AutosaveIndicator'
+import { AiAssistantModal, type AiModalPreset } from './AiAssistantModal'
+import { HelpTooltip } from '@/components/ui/HelpTooltip'
+import { QUICK_ACTIONS } from './aiAssistant'
 import { uploadTopicImage, useUpdateTopic } from '@/api/textPlanApi'
 import type { TextPlanTopic, TopicStatus } from '@/types/textPlan'
 
@@ -21,6 +24,13 @@ export function TopicEditorPanel({ projectId, topic }: { projectId: string; topi
   const [savedAt, setSavedAt] = useState<Date | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pending = useRef<{ title?: string; content_html?: string; content_json?: JSONContent }>({})
+  const editorRef = useRef<Editor | null>(null)
+  const [aiOpen, setAiOpen] = useState(false)
+  const [aiPreset, setAiPreset] = useState<AiModalPreset | undefined>(undefined)
+
+  const onEditorReady = useCallback((ed: Editor) => {
+    editorRef.current = ed
+  }, [])
 
   // content_json is the preferred editor source; fall back to HTML then plain text.
   const initialContent: string | JSONContent =
@@ -71,6 +81,21 @@ export function TopicEditorPanel({ projectId, topic }: { projectId: string; topi
     setSaveState('unsaved')
     if (timer.current) clearTimeout(timer.current)
     timer.current = setTimeout(flush, 1000)
+  }
+
+  const openAi = (preset?: AiModalPreset) => {
+    setAiPreset(preset)
+    setAiOpen(true)
+  }
+
+  // Insert generated HTML at the cursor; the editor's onUpdate queues the save.
+  const insertAi = (html: string) => {
+    editorRef.current?.chain().focus().insertContent(html).run()
+  }
+
+  // Replace the whole section body; `true` emits an update so autosave runs.
+  const replaceAi = (html: string) => {
+    editorRef.current?.commands.setContent(html, true)
   }
 
   const saveField = (body: Record<string, unknown>) => {
@@ -125,6 +150,7 @@ export function TopicEditorPanel({ projectId, topic }: { projectId: string; topi
 
       <RichTextEditor
         content={initialContent}
+        onReady={onEditorReady}
         onChange={(html, json) => queue({ content_html: html, content_json: json })}
         uploadImage={(file) => uploadTopicImage(projectId, topic.id, file)}
         onUploadError={(err) => notify((err as Error)?.message ?? 'Image upload failed.', 'error')}
@@ -134,13 +160,34 @@ export function TopicEditorPanel({ projectId, topic }: { projectId: string; topi
       </p>
 
       <div className="tb-ai-row">
-        <span className="muted" style={{ fontSize: 12 }}>AI assistant</span>
-        {['Draft with AI', 'Improve text', 'Summarize', 'Translate'].map((label) => (
-          <button key={label} className="btn btn--ghost btn--sm" disabled title="Coming soon">
-            {label}
+        <HelpTooltip helpKey="ai.generateText">
+          <button className="btn btn--primary btn--sm" onClick={() => openAi()}>
+            ✨ Generate with AI
+          </button>
+        </HelpTooltip>
+        <span className="muted" style={{ fontSize: 12 }}>Quick actions:</span>
+        {QUICK_ACTIONS.map((q) => (
+          <button
+            key={q.key}
+            className="btn btn--ghost btn--sm"
+            onClick={() => openAi({ action: q.action, tone: q.tone, language: q.language })}
+          >
+            {q.label}
           </button>
         ))}
       </div>
+
+      <AiAssistantModal
+        open={aiOpen}
+        onClose={() => setAiOpen(false)}
+        projectId={projectId}
+        sectionKey={topic.topic_type || undefined}
+        sectionTitle={title}
+        currentText={editorRef.current?.getText() ?? topic.plain_text}
+        preset={aiPreset}
+        onInsert={insertAi}
+        onReplace={replaceAi}
+      />
     </div>
   )
 }

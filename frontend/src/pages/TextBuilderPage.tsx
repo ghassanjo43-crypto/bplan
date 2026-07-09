@@ -7,6 +7,7 @@ import { TopicEditorPanel } from '@/components/textPlan/TopicEditorPanel'
 import { TextPlanRightPanel } from '@/components/textPlan/TextPlanRightPanel'
 import { OutlineSuggestionModal } from '@/components/textPlan/OutlineSuggestionModal'
 import { TextPlanCompletionBadge } from '@/components/textPlan/TextPlanCompletionBadge'
+import { HelpTooltip } from '@/components/ui/HelpTooltip'
 import {
   useCreateSection,
   useCreateTopic,
@@ -32,6 +33,11 @@ export function TextBuilderPage() {
   const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null)
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null)
   const [outlineOpen, setOutlineOpen] = useState(false)
+  // Collapse side columns to widen the editor (persisted across visits).
+  const [leftCollapsed, setLeftCollapsed] = useState(() => localStorage.getItem('tb.leftCollapsed') === '1')
+  const [rightCollapsed, setRightCollapsed] = useState(() => localStorage.getItem('tb.rightCollapsed') === '1')
+  const collapseLeft = (v: boolean) => { setLeftCollapsed(v); localStorage.setItem('tb.leftCollapsed', v ? '1' : '0') }
+  const collapseRight = (v: boolean) => { setRightCollapsed(v); localStorage.setItem('tb.rightCollapsed', v ? '1' : '0') }
 
   const createSection = useCreateSection(projectId)
   const updateSection = useUpdateSection(projectId)
@@ -109,11 +115,24 @@ export function TextBuilderPage() {
   }
 
   return (
-    <div className="tb">
-      {/* Left: outline navigator */}
+    <div className={`tb${leftCollapsed ? ' tb--left-collapsed' : ''}${rightCollapsed ? ' tb--right-collapsed' : ''}`}>
+      {/* Left: outline navigator (collapsible) */}
+      {leftCollapsed ? (
+        <aside className="tb-col tb-col--left">
+          <button className="tb-rail" title="Expand outline" onClick={() => collapseLeft(false)}>
+            <span className="tb-rail__icon">›</span>
+            <span className="tb-rail__label">Outline</span>
+          </button>
+        </aside>
+      ) : (
       <aside className="tb-col tb-col--left">
         <div className="tb-col__head">
-          <span>Outline</span>
+          <span className="tb-col__head-left">
+            <button className="tb-collapse-btn" title="Collapse outline" onClick={() => collapseLeft(true)}>
+              ‹
+            </button>
+            <HelpTooltip helpKey="narrative.editor">Outline</HelpTooltip>
+          </span>
           <button className="btn btn--secondary btn--sm" onClick={addSection}>
             ＋ Section
           </button>
@@ -141,6 +160,7 @@ export function TextBuilderPage() {
           </button>
         </div>
       </aside>
+      )}
 
       {/* Center: editor */}
       <main className="tb-col tb-col--center">
@@ -206,10 +226,25 @@ export function TextBuilderPage() {
         </div>
       </main>
 
-      {/* Right: guidance / settings / preview */}
-      <aside className="tb-col tb-col--right">
-        <TextPlanRightPanel projectId={projectId} section={section} topic={topic} />
-      </aside>
+      {/* Right: guidance / settings / preview (collapsible) */}
+      {rightCollapsed ? (
+        <aside className="tb-col tb-col--right">
+          <button className="tb-rail" title="Expand details" onClick={() => collapseRight(false)}>
+            <span className="tb-rail__icon">‹</span>
+            <span className="tb-rail__label">Details</span>
+          </button>
+        </aside>
+      ) : (
+        <aside className="tb-col tb-col--right">
+          <div className="tb-col__head">
+            <span className="tb-col__head-left">Details</span>
+            <button className="tb-collapse-btn" title="Collapse details" onClick={() => collapseRight(true)}>
+              ›
+            </button>
+          </div>
+          <TextPlanRightPanel projectId={projectId} section={section} topic={topic} />
+        </aside>
+      )}
 
       <OutlineSuggestionModal projectId={projectId} open={outlineOpen} onClose={() => setOutlineOpen(false)} hasExisting={sections.length > 0} />
     </div>

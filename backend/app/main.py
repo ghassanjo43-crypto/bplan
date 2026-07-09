@@ -155,6 +155,9 @@ app.include_router(revenue_streams_router, prefix=settings.api_prefix)
 # the generic /scenarios/{item_id}).
 from .routes.scenarios import router as scenarios_router  # noqa: E402
 app.include_router(scenarios_router, prefix=settings.api_prefix)
+# AI narrative generation (reads project data for context; never mutates it).
+from .routes.ai import router as ai_router  # noqa: E402
+app.include_router(ai_router, prefix=settings.api_prefix)
 for section_router in build_section_routers():
     app.include_router(section_router, prefix=settings.api_prefix)
 

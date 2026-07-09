@@ -9,6 +9,34 @@ import os
 from pathlib import Path
 
 
+def _load_dotenv() -> None:
+    """Load ``backend/.env`` into the process environment for local dev.
+
+    Minimal parser (no dependency): ``KEY=VALUE`` per line, ``#`` comments and
+    blank lines ignored, optional surrounding quotes stripped. Real environment
+    variables always win, so a deployed platform's config is never overridden.
+    """
+    env_path = Path(__file__).resolve().parent.parent / ".env"
+    if not env_path.exists():
+        return
+    try:
+        for raw in env_path.read_text(encoding="utf-8").splitlines():
+            line = raw.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            key = key.strip()
+            value = value.strip().strip('"').strip("'")
+            if key and key not in os.environ:
+                os.environ[key] = value
+    except Exception:
+        # Never let a malformed .env stop the app from booting.
+        pass
+
+
+_load_dotenv()
+
+
 class Settings:
     """Lightweight settings object (env-driven, no external deps)."""
 
@@ -70,6 +98,25 @@ class Settings:
     admin_reset: bool = os.getenv("BP_ADMIN_RESET", "false").lower() == "true"
     # Dev-only finance user assigned to the demo company (for tenant-isolation testing).
     seed_dev_users: bool = os.getenv("BP_SEED_DEV_USERS", "true").lower() == "true"
+
+    # AI narrative generation --------------------------------------------------
+    # Provider selection + API keys are read ONLY from the backend environment;
+    # the key is never sent to or exposed to the frontend. AI_PROVIDER may be
+    # "openai" or "anthropic"; when unset it is inferred from whichever key is
+    # present. If no key is configured the endpoint returns a clear 503.
+    ai_provider: str = os.getenv("AI_PROVIDER", "").strip().lower()
+    openai_api_key: str = os.getenv("OPENAI_API_KEY", "").strip()
+    anthropic_api_key: str = os.getenv("ANTHROPIC_API_KEY", "").strip()
+    openai_model: str = os.getenv("OPENAI_MODEL", "gpt-4o-mini").strip()
+    anthropic_model: str = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-5").strip()
+    ai_max_tokens: int = int(os.getenv("AI_MAX_TOKENS", "1500"))
+    ai_timeout_seconds: int = int(os.getenv("AI_TIMEOUT_SECONDS", "60"))
+    # TLS for outbound AI calls. On a network with HTTPS inspection (corporate
+    # proxy / antivirus), point AI_CA_BUNDLE at the interceptor's PEM, or — for
+    # local dev only — set AI_SSL_VERIFY=false to skip verification. Production
+    # should leave verification on (the default).
+    ai_ca_bundle: str = os.getenv("AI_CA_BUNDLE", "").strip()
+    ai_verify_ssl: bool = os.getenv("AI_SSL_VERIFY", "true").lower() != "false"
 
 
 settings = Settings()

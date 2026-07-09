@@ -5,6 +5,7 @@ import { pageBySlug } from '@/routes/nav'
 import { useCompany } from '@/api/companyApi'
 import { EditCompanyModal } from '@/components/company/EditCompanyModal'
 import { UserMenu } from '@/components/auth/UserMenu'
+import { HelpModeToggle } from '@/components/HelpModeToggle'
 import { useProjectContext } from './ProjectContext'
 
 function PencilIcon() {
@@ -73,6 +74,7 @@ export function TopBar() {
             <CompletionRing percent={percent} />
           </div>
         </div>
+        <HelpModeToggle />
         <UserMenu />
       </div>
 

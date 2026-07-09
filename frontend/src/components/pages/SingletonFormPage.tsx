@@ -101,6 +101,7 @@ export function SingletonFormPage<T extends object>({
         breadcrumb={`Business Plan · ${page?.group ?? ''}`}
         title={page?.label ?? ''}
         subtitle={page?.subtitle}
+        helpKey={slug === 'setup' ? 'project.setup' : undefined}
       />
       <div className="stack">
         {renderTop?.(values)}
