@@ -52,11 +52,8 @@ class AuthorizationMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         # --- authenticate ---
-        token = request.cookies.get("access_token")
-        if not token:
-            auth = request.headers.get("authorization", "")
-            if auth.lower().startswith("bearer "):
-                token = auth[7:]
+        auth = request.headers.get("authorization", "")
+        token = auth[7:] if auth.lower().startswith("bearer ") else request.cookies.get("access_token")
         data = decode_access_token(token) if token else None
         if not data:
             return _json(401, "Not authenticated")
@@ -67,7 +64,13 @@ class AuthorizationMiddleware(BaseHTTPMiddleware):
             return _json(401, "Not authenticated")
         if not user.is_active:
             return _json(401, "Account is disabled")
+        if data.get("ver", 0) != user.token_version:
+            return _json(401, "Session expired")
         is_admin = user.role == "admin"
+        # A temporary credential authenticates only into the password-change
+        # state. This server-side gate also covers direct URLs and stale tabs.
+        if user.must_change_password and not path.startswith("/api/auth/"):
+            return _json(403, "Password change required")
         # Trial enforcement backstop: a non-admin whose trial has expired is
         # blocked from every protected data route even if their access token was
         # issued before expiry. /api/auth/* (me, logout, change-password) stays

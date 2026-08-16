@@ -65,7 +65,7 @@ def _fail_generic() -> User:
     raise AuthError("Invalid email or password.")
 
 
-def change_password(user_id: str, current_password: str, new_password: str) -> None:
+def change_password(user_id: str, current_password: str, new_password: str) -> User:
     store = get_user_storage()
     user = store.get(user_id)
     if not verify_password(current_password, user.password_hash):
@@ -75,8 +75,10 @@ def change_password(user_id: str, current_password: str, new_password: str) -> N
         raise AuthError("New password needs " + ", ".join(problems) + ".")
     user.password_hash = hash_password(new_password)
     user.must_change_password = False
+    user.token_version += 1
     user.updated_at = utcnow()
     store.save(user)
+    return user
 
 
 # --------------------------------------------------------------------------

@@ -96,8 +96,13 @@ class CompanyAssignment(BaseModel):
 
 
 class ResetPasswordAdmin(BaseModel):
-    temporary_password: str = Field(..., min_length=8)
-    must_change_password: bool = True
+    """Confirmation body; the server generates the temporary credential."""
+    confirm: bool
+
+
+class ResetPasswordAdminResponse(BaseModel):
+    user: UserPublic
+    temporary_password: str
 
 
 class AuditLogPublic(BaseModel):

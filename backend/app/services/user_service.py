@@ -161,14 +161,17 @@ def assign_company(user_id: str, company_id: str | None) -> User:
     return store.save(user)
 
 
-def reset_password(user_id: str, temporary_password: str, must_change: bool = True) -> User:
+def reset_password(user_id: str, temporary_password: str) -> User:
     store = get_user_storage()
     user = store.get(user_id)
+    if user.role != "user":
+        raise UserError("Only normal user passwords can be reset here.")
     problems = validate_password_policy(temporary_password)
     if problems:
         raise UserError("Password needs " + ", ".join(problems) + ".")
     user.password_hash = hash_password(temporary_password)
-    user.must_change_password = must_change
+    user.must_change_password = True
+    user.token_version += 1
     user.failed_login_attempts = 0
     user.locked_until = None
     user.updated_at = utcnow()

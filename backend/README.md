@@ -39,6 +39,21 @@ A demo project (**Acme SaaS — Demo Plan**) is seeded automatically on first ru
 | `BP_CORS_ORIGINS`    | Vite dev URLs         | Comma-separated allowed origins              |
 | `BP_SEED_ON_STARTUP` | `true`                | Seed a demo project when the store is empty  |
 
+### Administrator credential lifecycle
+
+`ADMIN_EMAIL` and `ADMIN_PASSWORD` are bootstrap inputs only: on startup they
+create the first administrator when no administrator record exists. The saved
+user record (including its bcrypt password hash) is authoritative after that;
+changing `ADMIN_PASSWORD` does not change an existing administrator password.
+Administrators should normally use **Admin / Account / Security** in Planora.
+
+`BP_ADMIN_RESET=true` remains an explicit, one-deployment emergency recovery
+mechanism. It replaces the database-backed credential from `ADMIN_PASSWORD` and
+must immediately be returned to `false`; it is not a second runtime password.
+Admin resets of normal users generate a random temporary password on the server,
+show it once, revoke the user's prior JWT sessions, and require a permanent
+password before any non-auth API route is available.
+
 ## Project structure
 
 ```

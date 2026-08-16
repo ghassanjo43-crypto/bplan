@@ -27,6 +27,7 @@ import { TextBuilderPage } from '@/pages/TextBuilderPage'
 import { LoginPage } from '@/pages/LoginPage'
 import { GuidePage } from '@/pages/GuidePage'
 import { UserManagementPage } from '@/pages/admin/UserManagementPage'
+import { ChangePasswordPage } from '@/pages/ChangePasswordPage'
 import { ProtectedRoute, AdminRoute } from '@/auth/ProtectedRoute'
 
 export function AppRoutes() {
@@ -35,12 +36,14 @@ export function AppRoutes() {
       <Route path="/login" element={<LoginPage />} />
 
       <Route element={<ProtectedRoute />}>
+      <Route path="/change-password" element={<ChangePasswordPage />} />
       <Route path="/" element={<Navigate to="/projects" replace />} />
       <Route path="/projects" element={<ProjectsListPage />} />
       <Route path="/projects/new" element={<NewProjectPage />} />
       <Route path="/guide" element={<GuidePage />} />
       <Route element={<AdminRoute />}>
         <Route path="/admin/users" element={<UserManagementPage />} />
+        <Route path="/admin/security" element={<ChangePasswordPage />} />
       </Route>
 
       <Route path="/projects/:projectId" element={<AppLayout />}>

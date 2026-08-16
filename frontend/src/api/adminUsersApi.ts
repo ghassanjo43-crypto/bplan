@@ -46,8 +46,9 @@ export function useAssignCompany() {
 export function useResetUserPassword() {
   const invalidate = useInvalidate()
   return useMutation({
-    mutationFn: ({ id, temporary_password }: { id: string; temporary_password: string }) =>
-      api.post<ManagedUser>(`/admin/users/${id}/reset-password`, { temporary_password, must_change_password: true }),
+    mutationFn: (id: string) => api.post<{ user: ManagedUser; temporary_password: string }>(
+      `/admin/users/${id}/reset-password`, { confirm: true },
+    ),
     onSuccess: invalidate,
   })
 }

@@ -1,6 +1,9 @@
 """Admin user-management routes (admin-only; also enforced by middleware)."""
 from __future__ import annotations
 
+import secrets
+import string
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from ..dependencies.auth import require_admin
@@ -9,6 +12,7 @@ from ..schemas.user import (
     CompanyAssignment,
     ExtendTrial,
     ResetPasswordAdmin,
+    ResetPasswordAdminResponse,
     TrialSettings,
     UserCreate,
     UserPublic,
@@ -103,11 +107,24 @@ def enable_user(user_id: str, request: Request, admin: User = Depends(require_ad
     return to_public(_guard(user_service.set_active, user_id, True))
 
 
-@router.post("/{user_id}/reset-password", response_model=UserPublic)
+def _temporary_password() -> str:
+    # Guarantee every policy class, then cryptographically shuffle the result.
+    alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
+    chars = [secrets.choice(string.ascii_uppercase), secrets.choice(string.ascii_lowercase),
+             secrets.choice(string.digits), secrets.choice("!@#$%^&*")]
+    chars.extend(secrets.choice(alphabet) for _ in range(16))
+    secrets.SystemRandom().shuffle(chars)
+    return "".join(chars)
+
+
+@router.post("/{user_id}/reset-password", response_model=ResetPasswordAdminResponse)
 def reset_password(user_id: str, body: ResetPasswordAdmin, request: Request, admin: User = Depends(require_admin)):
-    u = to_public(_guard(user_service.reset_password, user_id, body.temporary_password, body.must_change_password))
+    if not body.confirm:
+        raise HTTPException(status_code=400, detail="Password reset must be confirmed.")
+    temporary = _temporary_password()
+    u = to_public(_guard(user_service.reset_password, user_id, temporary))
     audit_service.log("user_password_reset", user=admin, entity_type="user", entity_id=user_id, request=request)
-    return u
+    return ResetPasswordAdminResponse(user=u, temporary_password=temporary)
 
 
 @router.put("/{user_id}/company-assignment", response_model=UserPublic)

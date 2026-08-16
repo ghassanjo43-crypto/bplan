@@ -116,12 +116,15 @@ def test_company_and_project_lists_reflect_demo_access(env, auth_on):
 
 # -- admin management -------------------------------------------------------
 def test_admin_creates_user_with_demo_access(env, auth_on):
+    existing = get_user_storage().get_by_email("demo_new@test.com")
+    if existing:
+        get_user_storage().delete(existing.id)
     with TestClient(app) as c:
         h = _token(c, ADMIN_EMAIL, ADMIN_PW)
         r = c.post("/api/admin/users", headers=h, json={
             "email": "demo_new@test.com", "full_name": "New", "role": "user",
             "company_id": "co_demo_test", "temporary_password": "NewDemo123!",
-            "demo_company_access": True,
+            "demo_company_access": True, "must_change_password": False,
         })
         assert r.status_code == 201, r.text
         assert r.json()["demo_company_access"] is True

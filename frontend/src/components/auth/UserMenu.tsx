@@ -12,6 +12,11 @@ export function UserMenu() {
           👤 Users
         </button>
       )}
+      {isAdmin && (
+        <button className="btn btn--ghost btn--sm" onClick={() => navigate('/admin/security')} title="Account security">
+          Security
+        </button>
+      )}
       <span className="usermenu__id" title={currentUser.email}>
         {currentUser.full_name || currentUser.email}
         <span className="usermenu__role">{currentUser.role}</span>

@@ -85,11 +85,8 @@ def logout(response: Response, request: Request):
 def refresh(request: Request, response: Response):
     # Cross-domain clients send the refresh token as a bearer header since the
     # cookie isn't available; fall back to the cookie for same-origin clients.
-    token = request.cookies.get(REFRESH_COOKIE)
-    if not token:
-        auth = request.headers.get("authorization", "")
-        if auth.lower().startswith("bearer "):
-            token = auth[7:]
+    auth = request.headers.get("authorization", "")
+    token = auth[7:] if auth.lower().startswith("bearer ") else request.cookies.get(REFRESH_COOKIE)
     data = decode_refresh_token(token) if token else None
     if not data:
         raise HTTPException(status_code=401, detail="Session expired")
@@ -98,6 +95,8 @@ def refresh(request: Request, response: Response):
     except Exception:
         raise HTTPException(status_code=401, detail="Session expired")
     if not user.is_active:
+        raise HTTPException(status_code=401, detail="Session expired")
+    if data.get("ver", 0) != user.token_version:
         raise HTTPException(status_code=401, detail="Session expired")
     access, refresh_token = _issue_tokens(response, user)
     return LoginResponse(user=to_public(user), access_token=access, refresh_token=refresh_token)
@@ -109,15 +108,18 @@ def me(request: Request):
     return to_public(user)
 
 
-@router.post("/change-password")
-def change_password(body: ChangePasswordRequest, request: Request):
+@router.post("/change-password", response_model=LoginResponse)
+def change_password(body: ChangePasswordRequest, request: Request, response: Response):
     user = get_current_active_user(request)
+    if user.role != "admin" and not user.must_change_password:
+        raise HTTPException(status_code=403, detail="Password change is available to administrators or required accounts only.")
     try:
-        auth_service.change_password(user.id, body.current_password, body.new_password)
+        user = auth_service.change_password(user.id, body.current_password, body.new_password)
     except AuthError as exc:
         raise HTTPException(status_code=400, detail=exc.message)
     audit_service.log("change_password", user=user, request=request)
-    return {"message": "Password changed"}
+    access, refresh_token = _issue_tokens(response, user)
+    return LoginResponse(user=to_public(user), access_token=access, refresh_token=refresh_token)
 
 
 @router.post("/forgot-password")
@@ -126,9 +128,8 @@ def forgot_password(body: ForgotPasswordRequest, request: Request):
     user = get_user_storage().get_by_email(body.email)
     if user and user.is_active:
         token = create_reset_token(user)
-        # In dev (no secure cookies / no email provider) surface the token in the log.
-        if not settings.cookie_secure:
-            logger.warning("Password reset token for %s: %s", user.email, token)
+        # Delivery is intentionally delegated to the configured email layer.
+        # Reset credentials are never written to application logs.
     return {"message": "If an account exists for that email, a reset link has been sent."}
 
 

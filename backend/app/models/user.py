@@ -21,6 +21,9 @@ class User(TimestampedModel):
     is_active: bool = True
     is_verified: bool = False
     must_change_password: bool = False
+    # Embedded in every access/refresh token. Incrementing it invalidates all
+    # previously issued sessions without storing bearer tokens server-side.
+    token_version: int = 0
     failed_login_attempts: int = 0
     locked_until: datetime | None = None
     last_login_at: datetime | None = None

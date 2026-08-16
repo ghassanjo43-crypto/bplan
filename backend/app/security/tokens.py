@@ -18,7 +18,8 @@ def _encode(payload: dict, secret: str, expires: timedelta) -> str:
 
 def create_access_token(user) -> str:
     return _encode(
-        {"sub": user.id, "role": user.role, "company_id": user.company_id, "type": "access"},
+        {"sub": user.id, "role": user.role, "company_id": user.company_id,
+         "ver": user.token_version, "type": "access"},
         settings.jwt_secret,
         timedelta(minutes=settings.access_token_minutes),
     )
@@ -26,7 +27,7 @@ def create_access_token(user) -> str:
 
 def create_refresh_token(user) -> str:
     return _encode(
-        {"sub": user.id, "type": "refresh"},
+        {"sub": user.id, "ver": user.token_version, "type": "refresh"},
         settings.jwt_refresh_secret,
         timedelta(days=settings.refresh_token_days),
     )

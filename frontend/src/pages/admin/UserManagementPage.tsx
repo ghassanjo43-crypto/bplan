@@ -63,6 +63,8 @@ export function UserManagementPage() {
   const del = useDeleteUser()
   const [open, setOpen] = useState(false)
   const [trialUser, setTrialUser] = useState<ManagedUser | null>(null)
+  const [resetUser, setResetUser] = useState<ManagedUser | null>(null)
+  const [temporaryPassword, setTemporaryPassword] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [highlightEmail, setHighlightEmail] = useState<string | null>(null)
 
@@ -164,11 +166,7 @@ export function UserManagementPage() {
                               {(companiesQ.data ?? []).map((c) => <option key={c.id} value={c.id}>{c.company_name}</option>)}
                             </select>
                           )}
-                          <button className="btn btn--ghost btn--sm" onClick={() => {
-                            const pw = window.prompt('New temporary password (min 10 chars, upper/lower/number/special):')
-                            if (pw) resetPw.mutate({ id: u.id, temporary_password: pw }, {
-                              onSuccess: () => notify('Password reset'), onError: (e) => notify((e as Error).message, 'error') })
-                          }}>Reset PW</button>
+                          {u.role === 'user' && <button className="btn btn--ghost btn--sm" onClick={() => setResetUser(u)}>Reset password</button>}
                           <button className="btn btn--ghost btn--sm" onClick={() => {
                             if (window.confirm(`Delete ${u.email}?`)) del.mutate(u.id, { onSuccess: () => notify('User deleted') })
                           }}>🗑</button>
@@ -203,6 +201,21 @@ export function UserManagementPage() {
       })} companies={companiesQ.data ?? []} pending={create.isPending} />}
 
       {trialUser && <TrialModal user={trialUser} onClose={() => setTrialUser(null)} />}
+      {resetUser && <Modal title={`Reset password — ${resetUser.email}`} open onClose={() => { setResetUser(null); setTemporaryPassword(null) }} footer={
+        <div className="row" style={{ gap: 8, justifyContent: 'flex-end', width: '100%' }}>
+          <button className="btn btn--secondary" onClick={() => { setResetUser(null); setTemporaryPassword(null) }}>{temporaryPassword ? 'Done' : 'Cancel'}</button>
+          {!temporaryPassword && <button className="btn btn--primary" disabled={resetPw.isPending} onClick={() => resetPw.mutate(resetUser.id, {
+            onSuccess: (result) => { setTemporaryPassword(result.temporary_password); notify('Password reset successfully') },
+            onError: (e) => notify((e as Error).message, 'error'),
+          })}>{resetPw.isPending ? 'Resetting…' : 'Confirm reset'}</button>}
+        </div>
+      }>
+        {temporaryPassword ? <div className="stack--sm">
+          <div className="banner banner--info">Copy this temporary password now. It is shown only once and the user must replace it at login.</div>
+          <label className="field"><span className="field__label">One-time temporary password</span>
+            <input className="input" readOnly value={temporaryPassword} onFocus={e => e.currentTarget.select()} /></label>
+        </div> : <p>This immediately invalidates the user's old password and all existing sessions. Their role, company, and project access will not change.</p>}
+      </Modal>}
     </>
   )
 }
